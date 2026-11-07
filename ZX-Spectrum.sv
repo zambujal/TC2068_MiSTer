@@ -50,20 +50,23 @@ localparam ARCH_SCORP = 5'b101_11; // Scorpion ZS-256
 localparam ARCH_TC2068= 5'b110_00; // Timex TC2068
 
 // Timex TC2068 (memory code 6, the first entry of the Memory menu and the default):
-//   boot2.rom = the TC2068 ROM: HOME 16K + EXROM 8K (24 KB), optionally followed by the
-//   esxDOS firmware for the 2068 (ESX2068, 8 KB; 32 KB in all). It is loaded at 0x140000:
-//   HOME at ROM page 0, EXROM at page 1 (0x144000), ESX2068 at 0x146000.
+//   The 2068 ROM (HOME 16K + EXROM 8K, the TS2068 one) is inside the core (rtl/tc2068.mif, BRAM).
+//   A boot2.rom replaces it: loaded at 0x140000, HOME at ROM page 0, EXROM at 0x144000 (24 KB),
+//   optionally followed by an esxDOS firmware for the 2068 (ESX2068, 8 KB at 0x146000; 32 KB).
 //   #F4 (HSR): a bit set puts that 8K chunk in the EXROM (#FF bit 7 = 1) or the DOCK
 //   (#FF bit 7 = 0, empty: reads #FF); no RAM writes there. #FF bit 6 = 1 stops the frame
-//   interrupt. #F4 and #FF read back. AY at #F5 (register) / #F6 (data), the second
-//   Turbosound chip; #FFFD/#BFFD (full low byte #FD in this mode) keep the Turbosound one.
-//   Joysticks on AY register 14: A8 = joystick 1, A9 = joystick 2, active low,
-//   bit 0 up, 1 down, 2 left, 3 right, 7 fire. No 7FFD paging, no TR-DOS, +D, MF128 or
-//   Gluk ROM, no tape ROM traps (tapes play as audio). DivMMC with ESX2068 and the traps of
-//   the Kairos/DivTIESUS TC2068 mode: 0000, 0066, 3Dxx always; 0008, 0038 only with the
-//   HOME ROM at 0000-1FFF; 04C6 never; 0562 only right after an M1 at 0108 with the EXROM
-//   at 0000-1FFF (an EXROM patched with JP 0562 there). Without ESX2068 the DivMMC has
-//   no ROM (SD ports only).
+//   interrupt. #F4 and #FF read back. #FE answers only at #FE. AY at #F5 (register) / #F6
+//   (data), the second Turbosound chip; #FFFD/#BFFD (full low byte #FD in this mode) keep the
+//   Turbosound one. Joysticks on AY register 14: A8 = joystick 1, A9 = joystick 2, active
+//   low, bit 0 up, 1 down, 2 left, 3 right, 7 fire. No 7FFD paging, no TR-DOS, +D, MF128 or
+//   Gluk ROM, no tape ROM traps (tapes play as audio).
+//   DivMMC: the traps of the Kairos/DivTIESUS TC2068 mode: 0000, 0066, 3Dxx always; 0008, 0038
+//   only with the HOME ROM at 0000-1FFF; 04C6 never; 0562 only right after an M1 at 0108 with
+//   the EXROM at 0000-1FFF. esxDOS 0.8.9 (boot1.rom and the card's /SYS/ESXDOS.SYS) is patched
+//   on the fly while it is read: its calls to the 48K ROM go to the same routines of the 2068
+//   ROM, and its tape trap returns through EXROM 0030 (RRA / JP 010B), with JP 0562 at EXROM
+//   0108 while esxDOS is on and no tape is loaded from the OSD. Each byte is only changed when
+//   it still has the 0.8.9 value. Another esxDOS version: the DivMMC has no esxDOS in this mode.
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
@@ -448,7 +451,7 @@ T80pa cpu
 
 wire [7:0] cpu_din =  
 		ss_dout_en ? ss_dout                                  :
-		~nMREQ   ? (tape_dout_en ? tape_dout : tmx_dock_rd ? 8'hFF : ram_dout) :
+		~nMREQ   ? (tape_dout_en ? tape_dout : tmx_dock_rd ? 8'hFF : tmx_mem_q) :
 		~io_rd   ? port_ff                                    :
 		tmx_io   ? tmx_io_dout                                :
 		// non-Turbo base model: #1FFD reads return #FF, #7FFD is write-only
@@ -555,10 +558,11 @@ always_comb begin
 		'b0000_1_11: ram_addr = { 4'b0000, ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
 	endcase
 
-	// TC2068: the DivMMC ROM is ESX2068, an 8K chunk with its #F4 bit set is the EXROM (or the empty
+	// TC2068: the DivMMC ROM is ESX2068 (or boot1.rom, patched in cpu_din), an 8K chunk with its #F4 bit set is the EXROM (or the empty
 	// DOCK: cpu_din gives #FF), and 0000-3FFF is the HOME ROM; the DivMMC RAM is above (mmc_ram_en)
 	if(tmx_mode & ~snap_reset & ~load & ~tape_req & ~mmc_ram_en) begin
-		if(mmc_rom_en & ~addr[15] & ~addr[14]) ram_addr = { 3'b101, 4'd1, 1'b1, addr[12:0] }; // ESX2068
+		if(mmc_rom_en & ~addr[15] & ~addr[14]) ram_addr = tmx_esx_ok ? { 3'b101, 4'd1, 1'b1, addr[12:0] }  // ESX2068
+		                                                          : { 3'b101, 4'd3,       addr[13:0] }; // boot1.rom
 		else if(tmx_ext)                       ram_addr = { 3'b101, 4'd1, 1'b0, addr[12:0] }; // EXROM / DOCK
 		else if(~addr[15] & ~addr[14])         ram_addr = { 3'b101, 4'd0,       addr[13:0] }; // HOME ROM
 	end
@@ -738,7 +742,7 @@ end
 
 ////////////////////  TC2068  ////////////////////
 // (see the notes at ARCH_TC2068)
-wire       tmx_sel = (mem_mode == 6) & tmx_rom_ok;  // TC2068 chosen and boot2.rom has HOME + EXROM
+wire       tmx_sel = (mem_mode == 6);               // TC2068 chosen (its ROM is inside; boot2.rom replaces it)
 reg        tmx_mode = 0;                            // set at reset, like zx48
 reg  [7:0] tmx_hsr;                                 // #F4: chunks in EXROM/DOCK
 reg  [7:0] tmx_dec;                                 // #FF: the ULA keeps bits 5-0 for the video
@@ -781,6 +785,98 @@ wire       tmx_io      = tmx_mode & ~ss_active & ((addr[7:0] == 8'hF4) | (addr[7
 wire [7:0] tmx_io_dout = (addr[7:0] == 8'hF4) ? tmx_hsr :
                          (addr[7:0] == 8'hFF) ? tmx_dec :
                          (tmx_ay_reg == 8'd14) ? tmx_stick : tmx_psg_dout;
+
+
+// The 2068 ROM inside the core: HOME at 0000-3FFF, EXROM at 4000-5FFF (boot2.rom replaces it)
+wire        tmx_brom_rd = tmx_mode & ~tmx_rom_ok & ~mmc_rom_en & ~mmc_ram_en & ~ss_active &
+                          ((~addr[15] & ~addr[14] & ~tmx_ext) | (tmx_ext & tmx_dec[7]));
+wire  [7:0] tmx_brom_q;
+dpram #(.DATAWIDTH(8), .ADDRWIDTH(15), .MEM_INIT_FILE("rtl/tc2068.mif")) tmx_rom
+(
+	.clock(clk_sys),
+	.address_a(tmx_ext ? {2'b10, addr[12:0]} : {1'b0, addr[13:0]}),
+	.data_a(8'd0),
+	.wren_a(1'b0),
+	.q_a(tmx_brom_q),
+	.address_b(15'd0),
+	.data_b(8'd0),
+	.wren_b(1'b0),
+	.q_b()
+);
+
+// esxDOS 0.8.9 for the 2068 ROM, patched on the fly (the same changes as the Kairos ESX2068.BIN and
+// ESXD68.SYS, without the name of the system file). {valid, byte of 0.8.9, byte for the 2068}
+function [16:0] fw_tab(input [12:0] a);                       // ESXMMC.BIN (boot1.rom)
+	case(a)
+		13'h0175: fw_tab = {1'b1, 8'hF4, 8'h00}; 13'h0176: fw_tab = {1'b1, 8'h09, 8'h05}; // 09F4 -> 0500 PRINT-OUT
+		13'h0570: fw_tab = {1'b1, 8'h64, 8'h30}; 13'h0571: fw_tab = {1'b1, 8'h05, 8'h00}; // 0564 -> 0030 (tape trap return, EXROM)
+		13'h06B8: fw_tab = {1'b1, 8'h30, 8'h89}; 13'h06B9: fw_tab = {1'b1, 8'h25, 8'h28}; // 2530 -> 2889
+		13'h0C29: fw_tab = {1'b1, 8'h30, 8'h89}; 13'h0C2A: fw_tab = {1'b1, 8'h25, 8'h28}; // 2530 -> 2889
+		13'h0C2C: fw_tab = {1'b1, 8'hC5, 8'h54}; 13'h0C2D: fw_tab = {1'b1, 8'h16, 8'h13}; // 16C5 -> 1354
+		13'h0C42: fw_tab = {1'b1, 8'hB0, 8'h3F}; 13'h0C43: fw_tab = {1'b1, 8'h16, 8'h13}; // 16B0 -> 133F
+		13'h0C49: fw_tab = {1'b1, 8'h6E, 8'hA9}; 13'h0C4A: fw_tab = {1'b1, 8'h0D, 8'h08}; // 0D6E -> 08A9
+		13'h0D0F: fw_tab = {1'b1, 8'hC5, 8'h54}; 13'h0D10: fw_tab = {1'b1, 8'h16, 8'h13}; // 16C5 -> 1354
+		13'h0D5D: fw_tab = {1'b1, 8'hFB, 8'h68}; 13'h0D5E: fw_tab = {1'b1, 8'h19, 8'h17}; // 19FB -> 1768
+		13'h0D69: fw_tab = {1'b1, 8'h6E, 8'hD6}; 13'h0D6A: fw_tab = {1'b1, 8'h19, 8'h16}; // 196E -> 16D6
+		13'h0D79: fw_tab = {1'b1, 8'h8B, 8'hF3}; 13'h0D7A: fw_tab = {1'b1, 8'h19, 8'h16}; // 198B -> 16F3
+		13'h0D80: fw_tab = {1'b1, 8'hA7, 8'h0D}; 13'h0D81: fw_tab = {1'b1, 8'h11, 8'h0D}; // 11A7 -> 0D0D
+		13'h0D83: fw_tab = {1'b1, 8'hBF, 8'h4E}; 13'h0D84: fw_tab = {1'b1, 8'h16, 8'h13}; // 16BF -> 134E
+		13'h0DF3: fw_tab = {1'b1, 8'h01, 8'h30}; 13'h0DF4: fw_tab = {1'b1, 8'h16, 8'h12}; // 1601 -> 1230 CHAN-OPEN
+		default:  fw_tab = 17'd0;
+	endcase
+endfunction
+
+// /SYS/ESXDOS.SYS: its first 07FB bytes go to DivMMC bank 0 at 2000h (the rest to bank 1 at 3000h)
+function [16:0] sys_tab(input [12:0] a);
+	case(a)
+		13'h0368: sys_tab = {1'b1, 8'h81, 8'hE7}; 13'h0369: sys_tab = {1'b1, 8'h0F, 8'h0A}; // 0F81 -> 0AE7
+		13'h04C5: sys_tab = {1'b1, 8'h48, 8'hE7}; 13'h04C6: sys_tab = {1'b1, 8'h20, 8'h21}; // 2048 -> 21E7
+		13'h04DA: sys_tab = {1'b1, 8'h48, 8'hE7}; 13'h04DB: sys_tab = {1'b1, 8'h20, 8'h21}; // 2048 -> 21E7
+		13'h057F: sys_tab = {1'b1, 8'h8C, 8'hEF}; 13'h0580: sys_tab = {1'b1, 8'h1C, 8'h1B}; // 1C8C -> 1BEF
+		13'h0586: sys_tab = {1'b1, 8'hF1, 8'hAF}; 13'h0587: sys_tab = {1'b1, 8'h2B, 8'h2F}; // 2BF1 -> 2FAF
+		13'h05A9: sys_tab = {1'b1, 8'h48, 8'hE7}; 13'h05AA: sys_tab = {1'b1, 8'h20, 8'h21}; // 2048 -> 21E7
+		13'h05BA: sys_tab = {1'b1, 8'hF4, 8'h4A};                                           // 1BF4 -> 1B4A STMT-NEXT
+		13'h05C2: sys_tab = {1'b1, 8'h7D, 8'hC0}; 13'h05C3: sys_tab = {1'b1, 8'h1B, 8'h1A}; // 1B7D -> 1AC0 STMT-R-1
+		default:  sys_tab = 17'd0;
+	endcase
+endfunction
+
+// EXROM: its LD-BYTES enters the tape trap of esxDOS (JP 0562 instead of IN A,(FE) at 0108), which
+// comes back to 0030 (free in the EXROM): RRA / JP 010B
+function [16:0] ex_tab(input [12:0] a);
+	case(a)
+		13'h0030: ex_tab = {1'b1, 8'hFF, 8'h1F}; 13'h0031: ex_tab = {1'b1, 8'hFF, 8'hC3};
+		13'h0032: ex_tab = {1'b1, 8'hFF, 8'h0B}; 13'h0033: ex_tab = {1'b1, 8'hFF, 8'h01};
+		13'h0108: ex_tab = {1'b1, 8'hDB, 8'hC3}; 13'h0109: ex_tab = {1'b1, 8'hFE, 8'h62};
+		13'h010A: ex_tab = {1'b1, 8'h1F, 8'h05};
+		default:  ex_tab = 17'd0;
+	endcase
+endfunction
+
+// boot1.rom is esxDOS 0.8.9: the 28 bytes of fw_tab are there with the 0.8.9 values
+wire dl_esx = ioctl_download && (ioctl_index == 8'h40);
+reg  esx089 = 0;
+always @(posedge clk_sys) begin
+	reg old_dl = 0;
+	reg ok = 0;
+	reg [4:0] n = 0;
+	reg [16:0] t;
+	old_dl <= dl_esx;
+	t = fw_tab(ioctl_addr[12:0]);
+	if(dl_esx & ~old_dl) {ok, n} <= {1'b1, 5'd0};
+	if(dl_esx & ioctl_wr & ~|ioctl_addr[24:13] & t[16]) begin
+		if(ioctl_dout == t[15:8]) n <= n + 1'd1;
+		else ok <= 0;
+	end
+	if(old_dl & ~dl_esx) esx089 <= ok & (n == 5'd28);
+end
+
+wire        tmx_fw_on  = tmx_mode & mmc_rom_en & ~tmx_esx_ok & ~addr[15] & ~addr[14] & ~addr[13];
+wire        tmx_sys_on = tmx_mode & mmc_ram_en & (addr[15:13] == 3'b001) & (mmc_ram_bank == 4'd0);
+wire        tmx_ex_on  = tmx_mode & tmx_ext & tmx_dec[7] & ~mmc_rom_en & ~mmc_ram_en & (mmc_mode == 2'b11) & ~tape_loaded;
+wire [16:0] tmx_pt     = tmx_fw_on ? fw_tab(addr[12:0]) : tmx_sys_on ? sys_tab(addr[12:0]) : tmx_ex_on ? ex_tab(addr[12:0]) : 17'd0;
+wire  [7:0] tmx_mq     = tmx_brom_rd ? tmx_brom_q : ram_dout;
+wire  [7:0] tmx_mem_q  = (tmx_pt[16] && (tmx_mq == tmx_pt[15:8])) ? tmx_pt[7:0] : tmx_mq;
 
 
 ////////////////////  ULA PORT  ///////////////////
@@ -1265,8 +1361,9 @@ always @(posedge clk_sys) begin
 	if(reset) begin
 		vsd_sel  <= (vhd_en && !status[33:32]);
 		mmc_mode <= ((vhd_en || status[33:32]) && (mem_mode != 5)) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00; //no DivMMC on Scorpion
-		// TC2068 without ESX2068 in boot2.rom: no esxDOS (the 48K one would hang), only the SD ports
-		if(tmx_sel && !tmx_esx_ok && (vhd_en || status[33:32]) && !status[31:30]) mmc_mode <= 2'b01;
+		// TC2068 without ESX2068 in boot2.rom nor esxDOS 0.8.9 in boot1.rom: no esxDOS (another version
+		// would hang with the 2068 ROM), only the SD ports
+		if(tmx_sel && !tmx_esx_ok && !esx089 && (vhd_en || status[33:32]) && !status[31:30]) mmc_mode <= 2'b01;
 	end
 end
 
