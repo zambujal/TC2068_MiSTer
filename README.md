@@ -98,8 +98,15 @@ descarregar. É a ROM do Spectrum da Sinclair, hoje da Amstrad, com as mudanças
 Foi com esta ROM que se fizeram e viram as mudanças do esxDOS (no Kairos e no emulador). O `.mif` faz-se com
 `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
 
-O **esxDOS não está aqui**: é de [esxdos.org](https://www.esxdos.org) e cada um põe o seu `boot1.rom`; o core
-só leva a lista das mudanças (os endereços e os valores), não o código do esxDOS.
+**O esxDOS não vem com o core.** Descarrega-se o pacote do esxDOS 0.8.9 de [esxdos.org](https://www.esxdos.org), como
+para o core oficial. O pacote tem duas partes:
+
+- o ficheiro `ESXMMC.BIN`, a ROM da DivMMC (8 KB; numa DivMMC verdadeira vai gravada na EEPROM). No MiSTer muda-se-lhe
+  o nome para `boot1.rom` e põe-se em `games/TC2068/`;
+- as pastas `BIN`, `SYS` e `TMP`, que vão para a VHD (ou para o segundo cartão).
+
+Para o esxDOS funcionar com a ROM do 2068, o core troca alguns bytes enquanto o lê. Para isso guarda só uma pequena
+tabela com os bytes a trocar, não o esxDOS.
 
 ## Compilar
 

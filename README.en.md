@@ -98,8 +98,15 @@ download. It is the Sinclair Spectrum ROM, now Amstrad's, with Timex's changes:
 The esxDOS changes were made and checked with this ROM (on Kairos and in the emulator). The `.mif` is made with
 `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
 
-**esxDOS is not here:** it is from [esxdos.org](https://www.esxdos.org) and everyone puts their own `boot1.rom`;
-the core only carries the list of changes (addresses and values), not esxDOS code.
+**esxDOS does not come with the core.** Download the esxDOS 0.8.9 package from [esxdos.org](https://www.esxdos.org), as
+for the official core. The package has two parts:
+
+- the file `ESXMMC.BIN`, the DivMMC ROM (8 KB; on a real DivMMC it is written to the EEPROM). On the MiSTer, rename it
+  to `boot1.rom` and put it in `games/TC2068/`;
+- the `BIN`, `SYS` and `TMP` folders, which go on the VHD (or the secondary SD card).
+
+To make esxDOS work with the 2068 ROM, the core swaps a few bytes while reading it. For that it only keeps a small
+table of the bytes to swap, not esxDOS itself.
 
 ## Building
 
