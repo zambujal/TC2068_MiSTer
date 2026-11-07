@@ -23,6 +23,8 @@ module divmmc
 
     // control
     input         disable_pagein,
+    input         tmx,      // Timex TC2068 traps (as the Kairos/DivTIESUS TC2068 mode)
+    input         exlo,     // TC2068 with the EXROM at 0000-1FFF
     output        active_io,
 
     output        rom_active,
@@ -94,8 +96,13 @@ reg       conmem;
 reg       mapram;
 reg       automap;
 
+// TC2068 (tmx): 0000, 0066 and 3Dxx always; 0008 and 0038 only with the HOME ROM at 0000-1FFF
+// (the EXROM has its own); 04C6 never (other code in both ROMs); 0562 only at the M1 right after
+// an M1 at 0108 with the EXROM at 0000-1FFF: an EXROM patched with JP 0562 at 0108 (the
+// IN A,(FE) of its LD-BYTES, 0562 in the 48K) enters the tape handling of ESX2068.
 always @(posedge clk_sys) begin
 	reg m1_trigger;
+	reg armed;
 
 	if(mode == 2'b11) begin
 
@@ -107,11 +114,17 @@ always @(posedge clk_sys) begin
 		end
 
 		if(m1 & ~old_m1) begin
+			armed <= tmx & exlo & (addr == 16'h0108);
 			casex(addr)
-				16'h0000, 16'h0008, 16'h0038, 16'h0066:
+				16'h0000, 16'h0066:
 					m1_trigger <= 1;                  // activate automapper after this cycle
-				16'h04C6, 16'h0562:
-					m1_trigger <= !disable_pagein;    // disable tape traps when the built-in tape player is in use 
+				16'h0008, 16'h0038:
+					if(~tmx | ~exlo) m1_trigger <= 1;
+				16'h04C6:
+					if(~tmx) m1_trigger <= !disable_pagein;    // disable tape traps when the built-in tape player is in use
+				16'h0562:
+					if(~tmx) m1_trigger <= !disable_pagein;
+					else if(armed & !disable_pagein) m1_trigger <= 1;
 				16'h3DXX:
 					{automap, m1_trigger} <= 2'b11;   // activate automapper immediately
 				16'b0001111111111XXX:               // 1FF8...1FFF
@@ -127,6 +140,7 @@ always @(posedge clk_sys) begin
 		conmem     <= 0;
 		sram_page  <= 0;
 		mapram     <= 0;
+		armed      <= 0;
 	end
 end
 

@@ -47,6 +47,23 @@ localparam ARCH_P48   = 5'b011_10; // Pentagon 48
 localparam ARCH_P128  = 5'b000_10; // Pentagon 128
 localparam ARCH_P1024 = 5'b001_10; // Pentagon 1024
 localparam ARCH_SCORP = 5'b101_11; // Scorpion ZS-256
+localparam ARCH_TC2068= 5'b110_00; // Timex TC2068
+
+// Timex TC2068 (memory code 6, the first entry of the Memory menu and the default):
+//   boot2.rom = the TC2068 ROM: HOME 16K + EXROM 8K (24 KB), optionally followed by the
+//   esxDOS firmware for the 2068 (ESX2068, 8 KB; 32 KB in all). It is loaded at 0x140000:
+//   HOME at ROM page 0, EXROM at page 1 (0x144000), ESX2068 at 0x146000.
+//   #F4 (HSR): a bit set puts that 8K chunk in the EXROM (#FF bit 7 = 1) or the DOCK
+//   (#FF bit 7 = 0, empty: reads #FF); no RAM writes there. #FF bit 6 = 1 stops the frame
+//   interrupt. #F4 and #FF read back. AY at #F5 (register) / #F6 (data), the second
+//   Turbosound chip; #FFFD/#BFFD (full low byte #FD in this mode) keep the Turbosound one.
+//   Joysticks on AY register 14: A8 = joystick 1, A9 = joystick 2, active low,
+//   bit 0 up, 1 down, 2 left, 3 right, 7 fire. No 7FFD paging, no TR-DOS, +D, MF128 or
+//   Gluk ROM, no tape ROM traps (tapes play as audio). DivMMC with ESX2068 and the traps of
+//   the Kairos/DivTIESUS TC2068 mode: 0000, 0066, 3Dxx always; 0008, 0038 only with the
+//   HOME ROM at 0000-1FFF; 04C6 never; 0562 only right after an M1 at 0108 with the EXROM
+//   at 0000-1FFF (an EXROM patched with JP 0562 there). Without ESX2068 the DivMMC has
+//   no ROM (SD ports only).
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
@@ -61,7 +78,7 @@ localparam CONF_PLUS3 = "(+3) ";
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"Spectrum;;",
+	"TC2068;;",
 	"S0,TRDIMGDSKMGT,Load Disk;",
 	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
@@ -107,7 +124,7 @@ localparam CONF_STR = {
 	"D3P2OP,Snow Bug,Disabled,Enabled;",
 	"P2-;",
 	"P2O[9:8],Video Timings,ULA-48,ULA-128,Pentagon,Scorpion;",
-	"P2O[12:10],Memory,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3,Scorpion ZS-256;",
+	"P2O[12:10],Memory,Timex TC2068,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3,Scorpion ZS-256;",
 	"P2-;",
 	"P2O[33:32],MMC Mode,Auto(VHD),SD Card 14MHz,SD Card 28MHz;",
 	"P2O[31:30],MMC Version,DivMMC+ESXDOS,DivMMC,ZXMMC;",
@@ -326,7 +343,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.status_set(speed_set|arch_set|snap_hwset|opt_dan),
 	.status_in({status[63], status[62] | opt_dan, status[61:25],
 	             speed_set ? speed_req : (arch_set | snap_hwset) ? 3'b000 : status[24:22], status[21:13],
-	             arch_set ? arch : snap_hwset ? snap_hw : status[12:8], status[7:0]}),
+	             arch_set ? arch_status(arch) : snap_hwset ? arch_status(snap_hw) : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_blk_cnt(sd_blk_cnt),
@@ -354,11 +371,20 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.gamma_bus(gamma_bus)
 );
 
+// Memory menu: entry 0 = Timex TC2068, then the original list. mem_mode is the internal
+// code: the original values 0-5 and 6 = TC2068 (also in arch, snap_hw and the savestates).
+wire [2:0] mem_mode = (status[12:10] == 3'd0) ? 3'd6 : (status[12:10] - 3'd1);
+
+function [4:0] arch_status;   // internal {mem_mode, timings} -> status[12:8]
+	input [4:0] a;
+	arch_status = {(a[4:2] == 3'd6) ? 3'd0 : (a[4:2] + 3'd1), a[1:0]};
+endfunction
+
 reg  [2:0] cur_mode = 0;
-wire       need_apply = status[12:10] != cur_mode;
+wire       need_apply = mem_mode != cur_mode;
 
 always @(posedge clk_sys) begin
-	if(reset) cur_mode <= status[12:10];
+	if(reset) cur_mode <= mem_mode;
 end
 
 
@@ -386,6 +412,9 @@ wire        io_wr = ~nIORQ & ~nWR & nM1;
 wire        io_rd = ~nIORQ & ~nRD & nM1;
 wire        m1    = ~nM1 & ~nMREQ;
 
+// TC2068: #FF bit 6 = 1 stops the frame interrupt (not while the savestate code runs)
+wire        nINT_cpu = nINT | (tmx_mode & tmx_dec[6] & ~ss_active);
+
 wire[211:0]	cpu_reg;  // IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 wire        nHALT;
 wire [15:0] reg_DE  = cpu_reg[111:96];
@@ -398,7 +427,7 @@ T80pa cpu
 	.CEN_p(ce_cpu_p),
 	.CEN_n(ce_cpu_n),
 	.WAIT_n(mmc_ready),
-	.INT_n(nINT),
+	.INT_n(nINT_cpu),
 	.NMI_n(~NMI & dan_nmi_n),
 	.BUSRQ_n(nBUSRQ),
 	.M1_n(nM1),
@@ -419,8 +448,9 @@ T80pa cpu
 
 wire [7:0] cpu_din =  
 		ss_dout_en ? ss_dout                                  :
-		~nMREQ   ? (tape_dout_en ? tape_dout : ram_dout)      :
+		~nMREQ   ? (tape_dout_en ? tape_dout : tmx_dock_rd ? 8'hFF : ram_dout) :
 		~io_rd   ? port_ff                                    :
+		tmx_io   ? tmx_io_dout                                :
 		// non-Turbo base model: #1FFD reads return #FF, #7FFD is write-only
 		(scorp & (addr[14:0] == 15'h1FFD)) ? 8'hFF            :
 		fdc_sel  ? fdc_dout                                   :
@@ -485,8 +515,25 @@ reg         ram_rd;
 wire  [7:0] ram_dout;
 wire        ram_ready;
 
+// boot.rom -> 0x150000, boot1.rom (ESXMMC) -> 0x14C000, boot2.rom (TC2068) -> 0x140000
 reg [24:0] load_addr;
-always @(posedge clk_sys) load_addr <= ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 : ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
+always @(posedge clk_sys) load_addr <= ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 :
+                                                     (ioctl_index[7:6] == 2) ? 25'h140000 : ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
+
+// boot2.rom: the TC2068 ROM (24 KB), with ESX2068 when it has 32 KB; at most 32 KB is written
+wire dl_tmx      = ioctl_download && (ioctl_index == 8'h80);
+wire dl_tmx_over = dl_tmx && |ioctl_addr[24:15];
+reg  tmx_rom_ok = 0;
+reg  tmx_esx_ok = 0;
+always @(posedge clk_sys) begin
+	reg old_dl = 0;
+	old_dl <= dl_tmx;
+	if(dl_tmx & ~old_dl) {tmx_rom_ok, tmx_esx_ok} <= 0;
+	if(dl_tmx & ioctl_wr & ~dl_tmx_over) begin
+		if(ioctl_addr[14])              tmx_rom_ok <= 1; // the EXROM is there
+		if(ioctl_addr[14:13] == 2'b11) tmx_esx_ok <= 1; // and ESX2068
+	end
+end
 
 reg load;
 always @(posedge clk_sys) load <= (reset | ~nBUSACK) & ~nBUSRQ;
@@ -508,6 +555,14 @@ always_comb begin
 		'b0000_1_11: ram_addr = { 4'b0000, ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
 	endcase
 
+	// TC2068: the DivMMC ROM is ESX2068, an 8K chunk with its #F4 bit set is the EXROM (or the empty
+	// DOCK: cpu_din gives #FF), and 0000-3FFF is the HOME ROM; the DivMMC RAM is above (mmc_ram_en)
+	if(tmx_mode & ~snap_reset & ~load & ~tape_req & ~mmc_ram_en) begin
+		if(mmc_rom_en & ~addr[15] & ~addr[14]) ram_addr = { 3'b101, 4'd1, 1'b1, addr[12:0] }; // ESX2068
+		else if(tmx_ext)                       ram_addr = { 3'b101, 4'd1, 1'b0, addr[12:0] }; // EXROM / DOCK
+		else if(~addr[15] & ~addr[14])         ram_addr = { 3'b101, 4'd0,       addr[13:0] }; // HOME ROM
+	end
+
 	casex({snap_reset, load, tape_req})
 		'b1XX: ram_din = snap_data;
 		'b01X: ram_din = ioctl_dout;
@@ -523,9 +578,9 @@ always_comb begin
 
 	casex({snap_reset, load, tape_req})
 		'b1XX: ram_we = snap_wr;
-		'b01X: ram_we = ioctl_wr;
+		'b01X: ram_we = ioctl_wr & ~dl_tmx_over;
 		'b001: ram_we = 0;
-		'b000: ram_we = (mmc_ram_en | page_special | addr[15] | addr[14] | (~dan_rom & ~scorp & (plusd_mem | mf128_mem) & addr[13]) | (~dan_rom & scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
+		'b000: ram_we = (mmc_ram_en | page_special | ((addr[15] | addr[14]) & ~tmx_ext) | (~dan_rom & ~scorp & (plusd_mem | mf128_mem) & addr[13]) | (~dan_rom & scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
 	endcase
 
 	if(ss_active) begin
@@ -626,19 +681,21 @@ always @(posedge clk_sys) begin
 		page_128k   <= 0;
 		scorp_1ffd  <= 0;
 		mni_pending <= 0;
-		scorp       <= (status[12:10] == 5);
+		scorp       <= (mem_mode == 5);
 		page_reg[4] <= Fn[10];
 		page_reg_plus3[2] <= Fn[10];
-		shadow_rom <= shdw_reset & ~plusd_en;
-		if(Fn[10] && (rmod == 1) && (status[12:10] != 5)) begin
+		shadow_rom <= shdw_reset & ~plusd_en & ~tmx_sel;
+		if(Fn[10] && (rmod == 1) && (mem_mode != 5)) begin
 			p1024  <= 0;
 			pf1024 <= 0;
 			zx48   <= ~plus3;
+			tmx_mode <= 0;
 		end else begin
-			p1024 <= (status[12:10] == 1);
-			pf1024<= (status[12:10] == 2);
-			zx48  <= (status[12:10] == 3);
-			plus3 <= (status[12:10] == 4);
+			p1024 <= (mem_mode == 1);
+			pf1024<= (mem_mode == 2);
+			zx48  <= (mem_mode == 3) | (mem_mode == 6); // TC2068: 48K RAM, no 7FFD (without its ROM: a 48K)
+			plus3 <= (mem_mode == 4);
+			tmx_mode <= tmx_sel;
 		end
 	end else begin
 		if(snap_REGSet) begin
@@ -654,7 +711,7 @@ always @(posedge clk_sys) begin
 		end
 		else begin
 			if(m1 && ~old_m1 && addr[15:14]) shadow_rom <= 0;
-			if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3) shadow_rom <= 1; 
+			if(m1 && ~old_m1 && ~plusd_en && ~mod[0] && (addr == 'h66) && ~plus3 && ~tmx_mode) shadow_rom <= 1;
 
 			if(io_wr & ~old_wr) begin
 				if(scorp_1ffd_wr) begin
@@ -679,6 +736,53 @@ always @(posedge clk_sys) begin
 end
 
 
+////////////////////  TC2068  ////////////////////
+// (see the notes at ARCH_TC2068)
+wire       tmx_sel = (mem_mode == 6) & tmx_rom_ok;  // TC2068 chosen and boot2.rom has HOME + EXROM
+reg        tmx_mode = 0;                            // set at reset, like zx48
+reg  [7:0] tmx_hsr;                                 // #F4: chunks in EXROM/DOCK
+reg  [7:0] tmx_dec;                                 // #FF: the ULA keeps bits 5-0 for the video
+wire       tmx_ext     = tmx_mode & tmx_hsr[addr[15:13]] & ~ss_active;  // this chunk is EXROM/DOCK
+wire       tmx_dock_rd = tmx_ext & ~tmx_dec[7] & ~mmc_rom_en & ~mmc_ram_en;
+wire       tmx_exlo    = tmx_mode & tmx_hsr[0] & tmx_dec[7];            // EXROM at 0000-1FFF (DivMMC traps)
+
+always @(posedge clk_sys) begin
+	reg old_wr;
+	old_wr <= io_wr;
+
+	if(reset) {tmx_hsr, tmx_dec} <= 0;
+	else if(io_wr & ~old_wr & tmx_mode & ~ss_active) begin
+		if(addr[7:0] == 8'hF4) tmx_hsr <= cpu_dout;
+		if(addr[7:0] == 8'hFF) tmx_dec <= cpu_dout;
+	end
+end
+
+// AY at #F5/#F6 (the second Turbosound chip, #FE); joysticks on its register 14
+wire       tmx_ay_port = tmx_mode & ~ss_active & ((addr[7:0] == 8'hF5) | (addr[7:0] == 8'hF6));
+wire       tmx_ay_we   = tmx_ay_port & ~nIORQ & ~nWR & nM1;
+wire       tmx_ay_rdio = tmx_ay_port & (addr[7:0] == 8'hF6) & ~nIORQ & ~nRD & nM1;
+wire [7:0] tmx_psg_dout;
+
+reg  [7:0] tmx_ay_reg;
+always @(posedge clk_sys) begin
+	reg old_we;
+	old_we <= tmx_ay_we;
+
+	if(aud_reset) tmx_ay_reg <= 0;
+	else if(tmx_ay_we & ~old_we & (addr[7:0] == 8'hF5)) tmx_ay_reg <= cpu_dout;
+end
+
+wire [7:0] tmx_stick1 = {joy0[4], 3'b000, joy0[0], joy0[1], joy0[2], joy0[3]}; // fire, right, left, down, up
+wire [7:0] tmx_stick2 = {joy1[4], 3'b000, joy1[0], joy1[1], joy1[2], joy1[3]};
+wire [7:0] tmx_stick  = ~(({8{addr[8]}} & tmx_stick1) | ({8{addr[9]}} & tmx_stick2));
+
+// port reads: #F4, #FF, #F6
+wire       tmx_io      = tmx_mode & ~ss_active & ((addr[7:0] == 8'hF4) | (addr[7:0] == 8'hFF) | (addr[7:0] == 8'hF6));
+wire [7:0] tmx_io_dout = (addr[7:0] == 8'hF4) ? tmx_hsr :
+                         (addr[7:0] == 8'hFF) ? tmx_dec :
+                         (tmx_ay_reg == 8'd14) ? tmx_stick : tmx_psg_dout;
+
+
 ////////////////////  ULA PORT  ///////////////////
 reg [2:0] border_color = 3'b000;   // Scorpion reads this before write
 reg       ear_out;
@@ -700,7 +804,7 @@ end
 ////////////////////   AUDIO   ///////////////////
 wire  [7:0] psg_dout;
 wire signed [17:0] ts_l, ts_r;
-wire        psg_sel = /*addr[0] &*/ addr[15] & ~addr[1];
+wire        psg_sel = /*addr[0] &*/ addr[15] & ~addr[1] & (~tmx_mode | (addr[7:0] == 8'hFD)); // TC2068: not #F4/#F5
 wire        psg_we  = psg_sel & ~nIORQ & ~nWR & nM1;
 wire        psg_rd  = psg_sel & addr[14];
 reg         psg_reset;
@@ -735,6 +839,11 @@ turbosound turbosound
 	.BC(addr[14]),
 	.DI(cpu_dout),
 	.DO(psg_dout),
+
+	.TMX_BDIR(tmx_ay_we),
+	.TMX_BC(addr[7:0] == 8'hF5),
+	.TMX_RD(tmx_ay_rdio),
+	.TMX_DO(tmx_psg_dout),
 
 	.ENABLE(~status[39]),
 	.PSG_MIX(status[40]),
@@ -970,7 +1079,7 @@ wire [1:0] scale = status[16:15];
 wire       HSync, VSync, HBlank, VBlank;
 wire       ulap_ena, ulap_mono, mode512;
 wire       ulap_avail = ~status[14] & ~trdos_en;
-wire       tmx_avail = ~status[13] & ~trdos_en;
+wire       tmx_avail = (~status[13] | tmx_mode) & ~trdos_en; // the TC2068 always has its #FF
 wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
@@ -1137,7 +1246,7 @@ always @(posedge clk_sys) begin
 	end
 
 	old_m1 <= m1;
-	if(~old_m1 & m1 & mod[0] & (addr == 'h66) & ~&mmc_mode) {mf128_mem, mf128_en} <= 2'b11;
+	if(~old_m1 & m1 & mod[0] & (addr == 'h66) & ~&mmc_mode & ~tmx_mode) {mf128_mem, mf128_en} <= 2'b11;
 end
 
 //////////////////   MMC   //////////////////
@@ -1152,7 +1261,9 @@ always @(posedge clk_sys) begin
 	
 	if(reset) begin
 		vsd_sel  <= (vhd_en && !status[33:32]);
-		mmc_mode <= ((vhd_en || status[33:32]) && (status[12:10] != 5)) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00; //no DivMMC on Scorpion
+		mmc_mode <= ((vhd_en || status[33:32]) && (mem_mode != 5)) ? (status[31:30] ? status[31:30] : 2'b11) : 2'b00; //no DivMMC on Scorpion
+		// TC2068 without ESX2068 in boot2.rom: no esxDOS (the 48K one would hang), only the SD ports
+		if(tmx_sel && !tmx_esx_ok && (vhd_en || status[33:32]) && !status[31:30]) mmc_mode <= 2'b01;
 	end
 end
 
@@ -1171,6 +1282,8 @@ divmmc divmmc
 	.*,
 	.disable_pagein(tape_loaded | ss_active),
 	.mode(mmc_mode), //00-off, 01-divmmc, 10-zxmmc, 11-divmmc+esxdos
+	.tmx(tmx_mode),
+	.exlo(tmx_exlo),
 	.din(cpu_dout),
 	.dout(mmc_dout),
 	.active_io(mmc_sel),
@@ -1306,7 +1419,7 @@ always @(posedge clk_sys) begin
 		if(~old_wr & io_wr  & (addr[7:0] == 'hEF) & plusd_ena) {fdd_side, fdd_drive1} <= {cpu_dout[7], cpu_dout[1:0] != 2};
 		if(~old_wr & io_wr  & (addr[7:0] == 'hE7)) plusd_mem <= 0;
 		if(~old_rd & io_rd  & (addr[7:0] == 'hE7) & ~plusd_stealth) plusd_mem <= 1;
-		if(~old_m1 & m1 & ((addr == 'h08) | (addr == 'h3A) | (~mod[0] & ~&mmc_mode & (addr == 'h66)))) plusd_mem <= 1;
+		if(~old_m1 & m1 & ~tmx_mode & ((addr == 'h08) | (addr == 'h3A) | (~mod[0] & ~&mmc_mode & (addr == 'h66)))) plusd_mem <= 1;
 	end else begin
 		plusd_mem <= 0;
 		if(~old_wr & io_wr & fdd_sel & addr[7]) {fdd_side, fdd_reset, fdd_drive1} <= {~cpu_dout[4], ~cpu_dout[2], !cpu_dout[1:0]};
@@ -1314,7 +1427,7 @@ always @(posedge clk_sys) begin
 			// Keep the reduction OR: `addr[15:14] & <1 bit>` zero-extends and tests
 			// addr[14] alone, which stops TR-DOS paging out in #8000-#BFFF.
 			if((|addr[15:14]) & (~scorp | scorp_cur_rom)) trdos_en <= 0;
-				else if((addr[13:8] == 'h3D) & (scorp ? scorp_rom1 : active_48_rom) & ~&mmc_mode) trdos_en <= 1;
+				else if((addr[13:8] == 'h3D) & (scorp ? scorp_rom1 : active_48_rom) & ~&mmc_mode & ~tmx_mode) trdos_en <= 1;
 				//else if(~mod[0] & (addr == 'h66)) trdos_en <= 1;
 		end
 		if(mni_pending & scorp) trdos_en <= 1;
@@ -1430,7 +1543,7 @@ smart_tape tape
 	.m1(~nM1 & ~nMREQ),
 	.ula_rd(io_rd & ~addr[0]),
 	.reg_b(cpu_reg[95:88]),
-	.rom_en(active_48_rom & ~ss_active),
+	.rom_en(active_48_rom & ~ss_active & ~tmx_mode), // the TC2068 loads from its EXROM: no traps
 	.dout_en(tape_dout_en),
 	.dout(tape_dout)
 );
@@ -1467,24 +1580,25 @@ reg [4:0] arch;
 reg       arch_reset = 0;
 always @(posedge clk_sys) begin
 	reg [7:0] timeout = 0;
-	reg [6:1] old_Fn;
+	reg [7:1] old_Fn;
 	reg       setwait = 0;
 
 	arch_set <= 0;
-	old_Fn <= Fn[6:1];
-	if(mod == 2 && (old_Fn != Fn[6:1])) begin
+	old_Fn <= Fn[7:1];
+	if(mod == 2 && (old_Fn != Fn[7:1])) begin
 		if(~old_Fn[1] & Fn[1]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX48 }; // Alt+F1 - ZX 48
 		if(~old_Fn[2] & Fn[2]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX128}; // Alt+F2 - ZX 128/+2
 		if(~old_Fn[3] & Fn[3]) {setwait,arch_set,arch} <= {2'b11,ARCH_ZX3  }; // Alt+F3 - ZX 128 +3
 		if(~old_Fn[4] & Fn[4]) {setwait,arch_set,arch} <= {2'b11,ARCH_P48  }; // Alt+F4 - Pentagon 48
 		if(~old_Fn[5] & Fn[5]) {setwait,arch_set,arch} <= {2'b11,ARCH_P128 }; // Alt+F5 - Pentagon 128
 		if(~old_Fn[6] & Fn[6]) {setwait,arch_set,arch} <= {2'b11,ARCH_P1024}; // Alt+F6 - Pentagon 1024
+		if(~old_Fn[7] & Fn[7]) {setwait,arch_set,arch} <= {2'b11,ARCH_TC2068}; // Alt+F7 - Timex TC2068
 	end
 
 	if(timeout) timeout <= timeout - 1'd1;
 	else arch_reset <= 0;
 
-	if(setwait && (status[12:8] == arch)) begin
+	if(setwait && ({mem_mode, status[9:8]} == arch)) begin
 		timeout <= '1;
 		arch_reset <= 1;
 		setwait <= 0;
@@ -1530,7 +1644,7 @@ snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128, ARCH_SCORP) snap_loade
    .reset(snap_reset),
    .hwset(snap_hwset),
    .hw(snap_hw),
-   .hw_ack(status[12:8]),
+   .hw_ack({mem_mode, status[9:8]}),
 
    .border(snap_border),
    .reg_1ffd(snap_1ffd),
@@ -1594,7 +1708,7 @@ savestate_dev #("rtl/savestate_rom.mif") savestate_dev
 	.cpu_n(cpu_n),
 	.cpu_en(cpu_en),
 	.cpu_halted(~nHALT),
-	.no_stop(NMI | trdos_en | plusd_mem | mf128_mem | mmc_rom_en | mmc_ram_en | shadow_rom | (scorp & scorp_1ffd[1])),
+	.no_stop(NMI | trdos_en | plusd_mem | mf128_mem | mmc_rom_en | mmc_ram_en | shadow_rom | (scorp & scorp_1ffd[1]) | (tmx_mode & |tmx_hsr)), // TC2068: #F4 is not saved, so only with all chunks in HOME
 	.stop_req(ss_stop_req),
 	.stopped(ss_stopped),
 	.freezing(ss_freezing),

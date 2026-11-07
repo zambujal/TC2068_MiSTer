@@ -35,6 +35,13 @@ module turbosound
     input   [7:0] DI,          // Data In
     output  [7:0] DO,          // Data Out
 
+    // Timex TC2068 AY (#F5 register, #F6 data): always the second chip (the #FE one, ym2203_0),
+    // whatever the Turbosound selection; it does not change the selection
+    input         TMX_BDIR,    // write to #F5 or #F6
+    input         TMX_BC,      // 1 = #F5 (register number), 0 = #F6 (data)
+    input         TMX_RD,      // read of #F6
+    output  [7:0] TMX_DO,
+
     input         HQ_ENABLE,   // Enable HQ audio pipeline
     input   [1:0] STEREO_MODE, // 0=ABC, 1=ACB, 2=Mono
     input         PUNCH_ENABLE,// Enable punch enhancement
@@ -60,22 +67,34 @@ reg       RESET_s;
 reg       BDIR_s;
 reg       BC_s;
 reg [7:0] DI_s;
+reg       TBDIR_s;
+reg       TBC_s;
+reg       TRD_s;
 
 always_ff @(posedge CLK) begin
     reg       RESET_d;
     reg       BDIR_d;
     reg       BC_d;
     reg [7:0] DI_d;
+    reg       TBDIR_d;
+    reg       TBC_d;
+    reg       TRD_d;
 
     RESET_d <= RESET;
     BDIR_d <= BDIR;
     BC_d <= BC;
     DI_d <= DI;
+    TBDIR_d <= TMX_BDIR;
+    TBC_d <= TMX_BC;
+    TRD_d <= TMX_RD;
 
     RESET_s <= RESET_d;
     BDIR_s <= BDIR_d;
     BC_s <= BC_d;
     DI_s <= DI_d;
+    TBDIR_s <= TBDIR_d;
+    TBC_s <= TBC_d;
+    TRD_s <= TRD_d;
 end
 
 
@@ -83,11 +102,14 @@ reg ay_select = 1;
 reg stat_sel  = 1;
 reg fm_ena    = 0;
 reg ym_wr     = 0;
+reg ym_tmx    = 0;   // the write in progress came from #F5/#F6: chip 0 only
 reg [7:0] ym_di;
 
 always_ff @(posedge CLK or posedge RESET_s) begin
     reg old_BDIR = 0;
+    reg old_TBDIR = 0;
     reg ym_acc = 0;
+    reg tmx_acc = 0;
 
     if (RESET_s) begin
         ay_select <= 1;
@@ -96,11 +118,16 @@ always_ff @(posedge CLK or posedge RESET_s) begin
         ym_acc    <= 0;
         ym_wr     <= 0;
         old_BDIR  <= 0;
+        old_TBDIR <= 0;
+        tmx_acc   <= 0;
+        ym_tmx    <= 0;
     end
     else begin
         ym_wr <= 0;
         old_BDIR <= BDIR_s;
+        old_TBDIR <= TBDIR_s;
         if (~old_BDIR & BDIR_s) begin
+            ym_tmx <= 0;
             if(BC_s & &DI_s[7:3]) begin
                 ay_select <=  DI_s[0];
                 stat_sel  <=  DI_s[1];
@@ -116,8 +143,24 @@ always_ff @(posedge CLK or posedge RESET_s) begin
             end
             ym_di <= DI_s;
         end
+        else if (~old_TBDIR & TBDIR_s) begin
+            ym_tmx <= 1;
+            if(TBC_s) begin
+                tmx_acc <= !DI_s[7:4] || fm_ena;
+                ym_wr   <= !DI_s[7:4] || fm_ena;
+            end
+            else begin
+                ym_wr <= tmx_acc;
+            end
+            ym_di <= DI_s;
+        end
     end
 end
+
+// chip address line: at a write 0 = register number, 1 = data; else the read select
+// (a #F6 read always reads the PSG register of chip 0)
+wire ym_a  = ym_wr ? (ym_tmx ? ~TBC_s : ~BC_s) : BDIR_s ? ~BC_s : stat_sel;
+wire ym_a0 = (TRD_s & ~ym_wr) ? 1'b1 : ym_a;
 
 
 wire  [7:0] psg_ch_a_0;
@@ -133,8 +176,8 @@ jt03 ym2203_0
     .clk(CLK),
     .cen(CE),
     .din(ym_di),
-    .addr((BDIR_s|ym_wr) ? ~BC_s : stat_sel),
-    .cs_n(ay_select),
+    .addr(ym_a0),
+    .cs_n(ym_tmx ? 1'b0 : ay_select),
     .wr_n(~ym_wr),
     .dout(DO_0),
 
@@ -162,8 +205,8 @@ jt03 ym2203_1
     .clk(CLK),
     .cen(CE),
     .din(ym_di),
-    .addr((BDIR_s|ym_wr) ? ~BC_s : stat_sel),
-    .cs_n(~ay_select),
+    .addr(ym_a),
+    .cs_n(ym_tmx ? 1'b1 : ~ay_select),
     .wr_n(~ym_wr),
     .dout(DO_1),
 
@@ -179,6 +222,7 @@ jt03 ym2203_1
 );
 
 assign DO = ay_select ? DO_1 : DO_0;
+assign TMX_DO = DO_0;
 
 
 reg         [8:0] psg_a, psg_b, psg_c;
