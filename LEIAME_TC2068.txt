@@ -1,0 +1,51 @@
+TC2068 PARA O MiSTer - o core ZX-Spectrum oficial (MiSTer-devel, 2026-10-31) com o Timex TC2068
+Fonte de 2026-11-07, etapa 1 (sem a FDD3000). Ainda nao testado no MiSTer.
+
+1. COMPILAR (Windows)
+---------------------
+- Quartus Prime Lite 17.0 (o do MiSTer, 17.0.2).
+- Descompactar numa pasta sem espacos nem acentos, por exemplo C:\mister\TC2068
+- No Quartus: File -> Open Project -> TC2068.qpf; Processing -> Start Compilation (uns 15-25 minutos).
+- Sai output_files\TC2068.rbf
+
+2. NO CARTAO DO MiSTer
+----------------------
+- TC2068.rbf -> /media/fat/_Computer/  (ou a raiz do cartao)
+- pasta /media/fat/games/TC2068/ com:
+    boot.rom   o boot.rom do core ZX-Spectrum oficial (o de games/Spectrum/, ou o releases/boot.rom do
+               repositorio MiSTer-devel/ZX-Spectrum_MISTer)
+    boot1.rom  o ESXMMC.BIN (o esxDOS; o mesmo do cartao do Kairos, SYS/ROMS/ESXMMC.BIN)
+    boot2.rom  o 2068.rom do cartao do Kairos (BIN/2068.rom): 24K (HOME + EXROM), ou 32K com o ESX2068 a
+               seguir (da' o esxDOS no TC2068)
+- Liga como Timex TC2068: e' o primeiro da lista em F12 -> Hardware -> Memory (depois de mudar a maquina:
+  Reset & Apply). Alt+F7 tambem passa para o TC2068; Alt+F1..F6 sao os outros, como no core oficial.
+- Sem o boot2.rom (ou com menos de 24K) o TC2068 arranca como um Spectrum 48K.
+
+3. O QUE TEM
+------------
+- ROM HOME 16K + EXROM 8K. Porta F4 (HSR) e porta FF: bit 7 EXROM (1) / DOCK (0), bit 6 = 1 desliga a
+  interrupcao; as duas leem-se de volta. O DOCK esta' vazio (le FFh, nao se escreve).
+- Video do Timex: ecra 2, hi-colour, hi-res 512 (o core oficial ja' os tinha). ULA+.
+- AY do TC2068 em F5 (registo) / F6 (dados): e' o segundo chip do TurboSound, por isso FFFD/BFFD continuam a
+  dar o TurboSound (dois AY) e a musica do 128K. Joysticks do 2068 no registo 14 do AY (OUT F5,14 / IN F6 com
+  A8 = joystick 1, A9 = joystick 2): o joystick 1 e o 2 do MiSTer. O Kempston (1Fh) tambem esta'.
+- General Sound (512K por defeito).
+- DivMMC: F12 -> Hardware -> MMC Mode (Auto = so' com uma VHD escolhida; SD Card = o segundo cartao).
+  No TC2068 o firmware e' o ESX2068 (o boot2.rom de 32K); com o de 24K a DivMMC fica sem esxDOS (so' as
+  portas do cartao). As traps sao as do modo TC2068 do Kairos: 0000, 0066 e 3Dxx sempre; 0008 e 0038 so' com
+  a ROM HOME em 0000-1FFF; 04C6 nunca; 0562 so' logo a seguir a 0108 com a EXROM (a EXROM remendada).
+  O ESX2068 novo procura /SYS/ESXD68.SYS no cartao (o ESXDOS.SYS do 2068), como no Kairos.
+- Nao ha' 7FFD, TR-DOS, +D, MF128 nem a ROM do Gluk no TC2068. As cassetes (TAP/TZX/PZX/CSW pelo F12)
+  tocam como som: o carregamento rapido so' existe para a ROM do 48K.
+- Os savestates nao guardam a F4 nem a FF: so' gravam com a F4 a 0 (a HOME em tudo) e voltam com o modo
+  de video normal.
+
+4. O QUE MUDOU NA FONTE (em relacao ao core oficial)
+----------------------------------------------------
+ZX-Spectrum.sv (a maquina, as portas, o mapa da memoria, o menu), rtl/turbosound.sv (as portas F5/F6 no
+segundo chip), rtl/divmmc.v (as traps do TC2068), ZX-Spectrum.sdc (uma linha), TC2068.qpf/.qsf/.srf (o
+projecto com o nome novo; sai TC2068.rbf). A pasta dos jogos passa a ser games/TC2068.
+
+5. A SEGUIR
+-----------
+A FDD3000 (o segundo Z80, o WD1770, o Timex Interface e o .DSK pelo F12), sempre ligada.
