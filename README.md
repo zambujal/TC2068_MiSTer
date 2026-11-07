@@ -42,7 +42,9 @@ O esxDOS no TC2068 (em baixo) só foi feito e visto com a ROM que o core traz.
 - **Joysticks:** os dois do MiSTer são os dois do TC2068 (o `STICK` do BASIC); o Kempston também está.
 - **Som:** o AY do TC2068, o TurboSound (dois AY nas portas do 128K), o General Sound e o beeper.
 - **Vídeo:** os modos do TC2068 (segundo ecrã, hi-colour, hi-res 512×192) e o ULAplus.
-- **DivMMC:** F12 → Hardware → MMC Mode (Auto = só com uma VHD escolhida; SD Card = o segundo cartão).
+- **DivMMC:** F12 → Hardware → MMC Mode (Auto = só com uma VHD escolhida; SD Card = o segundo cartão). No
+  cartão (ou na VHD) vão as pastas `BIN`, `SYS` e `TMP` do pacote do esxDOS 0.8.9, como no core oficial; não é
+  preciso mais nada. O **F11** é o NMI: abre o browser do esxDOS, como nos outros cores.
 
 ## O esxDOS no TC2068
 
