@@ -118,5 +118,5 @@ um registo; e o `ZX-Spectrum.sdc` dá dois ciclos aos caminhos que partem do que
 
 - **O core ZX-Spectrum do MiSTer:** Sorgelig e outros (GPL; ver [README_ZX-Spectrum.md](README_ZX-Spectrum.md)
   e os cabeçalhos dos ficheiros).
-- **O TC2068** (GPL, como o resto): António Vitor. Foi usada IA (Claude) no processo.
+- **O TC2068** (GPL, como o resto): António Vitor. Foi usada IA (Claude).
 - **A ROM do TS2068:** Amstrad (Sinclair) e Timex; ver em cima.

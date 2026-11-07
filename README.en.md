@@ -118,5 +118,5 @@ and #FF, the DivMMC #E3) and at the Z80 refresh signal on the way to the SDRAM.
 
 - **The MiSTer ZX-Spectrum core:** Sorgelig and others (GPL; see [README_ZX-Spectrum.md](README_ZX-Spectrum.md)
   and the file headers).
-- **The TC2068** (GPL, like the rest): António Vitor. AI (Claude) was used in the process.
+- **The TC2068** (GPL, like the rest): António Vitor. AI (Claude) used.
 - **The TS2068 ROM:** Amstrad (Sinclair) and Timex; see above.
