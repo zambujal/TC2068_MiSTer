@@ -100,8 +100,9 @@ the core only carries the list of changes (addresses and values), not esxDOS cod
 
 ## Building
 
-Quartus Prime Lite 17.0.2 (the MiSTer one): open `TC2068.qpf` and Processing → Start Compilation. The result is
-`output_files/TC2068.rbf`. Compared with the official core, `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
+Quartus Prime Lite 17.0.2 (the MiSTer one) or Lite 25.1 (with Cyclone V support): open `TC2068.qpf` and
+Processing → Start Compilation. The result is `output_files/TC2068.rbf`. `sys/sys.qip` picks `sys/pll_q<version>.qip`
+for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
 `rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and `rtl/tc2068.mif` and
 `tools/rom2mif.py` are added.
 

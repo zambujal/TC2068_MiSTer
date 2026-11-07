@@ -100,8 +100,9 @@ só leva a lista das mudanças (os endereços e os valores), não o código do e
 
 ## Compilar
 
-Quartus Prime Lite 17.0.2 (o do MiSTer): abrir `TC2068.qpf` e Processing → Start Compilation. Sai
-`output_files/TC2068.rbf`. Em relação ao core oficial mudam `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
+Quartus Prime Lite 17.0.2 (o do MiSTer) ou o Lite 25.1 (com o suporte do Cyclone V): abrir `TC2068.qpf` e
+Processing → Start Compilation. Sai `output_files/TC2068.rbf`. O `sys/sys.qip` vai buscar o `sys/pll_q<versão>.qip`
+da versão do Quartus: há o 17 e o 25 (igual ao 17). Em relação ao core oficial mudam `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
 `rtl/divmmc.v`, `ZX-Spectrum.sdc`, o projecto (`TC2068.qpf`, `.qsf`, `.srf`) e juntam-se `rtl/tc2068.mif` e
 `tools/rom2mif.py`.
 
