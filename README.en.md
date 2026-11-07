@@ -25,6 +25,10 @@ Everything else is optional and goes in the folder `games/TC2068/`:
 | `boot.rom` | only for the other machines of the core (48K, 128K, +3, TR-DOS, +D…); the TC2068 does not need it | the one of the official ZX-Spectrum core: `releases/boot.rom` in this repository, or `games/Spectrum/boot.rom` if the official core is already on the card |
 | `boot2.rom` | another ROM for the TC2068, instead of the one in the core | below |
 
+This repository's `releases/` folder only has the TC2068 core and `boot.rom`. The other files the official core keeps
+in its folder, such as `savestates.sav` (for F12 → Savestate Disk) and `dsdd720k.dsk.gz` (an empty DSDD disk), are at
+[MiSTer-devel/ZX-Spectrum_MISTer](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
+
 `boot2.rom` is for using another ROM: 24K (HOME 16K + EXROM 8K). For example the Portuguese TC2068 one that
 comes with the [Fuse](https://fuse-emulator.sourceforge.net) emulator (`roms` folder), HOME first, then EXROM:
 
