@@ -1,5 +1,5 @@
 TC2068 PARA O MiSTer - o core ZX-Spectrum oficial (MiSTer-devel, 2026-10-31) com o Timex TC2068
-Fonte de 2026-11-07, etapa 1 (sem a FDD3000). Ainda nao testado no MiSTer.
+Fonte de 2026-11-07. Ainda nao testado no MiSTer.
 
 1. COMPILAR (Windows)
 ---------------------
@@ -50,7 +50,3 @@ Fonte de 2026-11-07, etapa 1 (sem a FDD3000). Ainda nao testado no MiSTer.
 ZX-Spectrum.sv (a maquina, as portas, o mapa da memoria, o menu), rtl/turbosound.sv (as portas F5/F6 no
 segundo chip), rtl/divmmc.v (as traps do TC2068), ZX-Spectrum.sdc (uma linha), TC2068.qpf/.qsf/.srf (o
 projecto com o nome novo; sai TC2068.rbf). A pasta dos jogos passa a ser games/TC2068.
-
-5. A SEGUIR
------------
-A FDD3000 (o segundo Z80, o WD1770, o Timex Interface e o .DSK pelo F12), sempre ligada.
