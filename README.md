@@ -55,16 +55,14 @@ O esxDOS no TC2068 (em baixo) só foi feito e visto com a ROM que o core traz.
 O esxDOS chama rotinas da ROM do 48K pelo endereço; na ROM do 2068 essas rotinas estão noutros sítios, e o
 esxDOS normal pendura. Neste core, no TC2068, o próprio core corrige o **esxDOS 0.8.9 enquanto o lê** — o
 `boot1.rom` e o `/SYS/ESXDOS.SYS` do cartão, sem mexer nos ficheiros: 14 chamadas no firmware e 8 no
-`ESXDOS.SYS` passam para as rotinas iguais da ROM do 2068 (as mesmas mudanças do ESX2068 do
-[Kairos](https://github.com/zambujal/Kairos)). Cada byte só muda se ainda tiver o valor do 0.8.9: o mesmo cartão
-serve para todas as máquinas, e as outras não vêem diferença nenhuma.
+`ESXDOS.SYS` passam para as rotinas iguais da ROM do 2068. Cada byte só muda se ainda tiver o valor do 0.8.9: o
+mesmo cartão serve para todas as máquinas, e as outras não vêem diferença nenhuma.
 
 - Com outra versão do esxDOS no `boot1.rom`, a DivMMC fica sem esxDOS no TC2068 (só as portas do cartão).
   O `boot1.rom` e o `ESXDOS.SYS` do cartão têm de ser do mesmo 0.8.9 (o core oficial já pede que sejam iguais).
 - `LOAD ""` com um TAP aberto pelo `.tapein`: enquanto o esxDOS está ligado (e não há cassete no F12), o
   LD-BYTES da EXROM entra no tratamento de cassete do esxDOS (JP 0562 em 0108, e o regresso por 0030, que na
   EXROM estava livre).
-- Um `boot2.rom` de 32K com o ESX2068 do Kairos a seguir à EXROM também serve; esse procura `/SYS/ESXD68.SYS`.
 
 ## O TC2068 neste core
 
@@ -76,7 +74,7 @@ serve para todas as máquinas, e as outras não vêem diferença nenhuma.
   dois AY. Joysticks no registo 14: A8 = joystick 1, A9 = joystick 2, activos a 0; bit 0 cima, 1 baixo,
   2 esquerda, 3 direita, 7 fogo.
 - Sem 7FFD, TR-DOS, +D, Multiface nem a ROM do Gluk.
-- DivMMC com as traps do modo TC2068 do Kairos: 0000, 0066 e 3Dxx sempre; 0008 e 0038 só com a HOME em
+- DivMMC com as traps adaptadas ao TC2068: 0000, 0066 e 3Dxx sempre; 0008 e 0038 só com a HOME em
   0000–1FFF; 04C6 nunca; 0562 só logo a seguir a um M1 em 0108 com a EXROM.
 - Os savestates não guardam a F4 nem a FF: só gravam com a F4 a 0 e voltam no modo de vídeo normal.
 
@@ -96,7 +94,7 @@ descarregar. É a ROM do Spectrum da Sinclair, hoje da Amstrad, com as mudanças
   ([README.copyright](https://k1.spdns.de/Develop/Projects/zxsp/Media/Roms/README.copyright)); a do TS2068 tem a
   mesma origem.
 
-Foi com esta ROM que se fizeram e viram as mudanças do esxDOS (no Kairos e no emulador). O `.mif` faz-se com
+Foi com esta ROM que se fizeram e viram as mudanças do esxDOS. O `.mif` faz-se com
 `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
 
 **O esxDOS não vem com o core.** Descarrega-se o pacote do esxDOS 0.8.9 de [esxdos.org](https://www.esxdos.org), como

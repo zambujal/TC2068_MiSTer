@@ -55,16 +55,14 @@ esxDOS on the TC2068 (below) was only made and checked with the ROM in the core.
 esxDOS calls routines of the 48K ROM by address; in the 2068 ROM those routines are elsewhere, and the normal
 esxDOS hangs. In this core, on the TC2068, the core itself patches **esxDOS 0.8.9 while reading it** — `boot1.rom`
 and the card's `/SYS/ESXDOS.SYS`, without touching the files: 14 calls in the firmware and 8 in `ESXDOS.SYS` go
-to the same routines of the 2068 ROM (the same changes as the ESX2068 of
-[Kairos](https://github.com/zambujal/Kairos)). Each byte only changes if it still has the 0.8.9 value: the same
-card works for every machine, and the other machines see no difference at all.
+to the same routines of the 2068 ROM. Each byte only changes if it still has the 0.8.9 value: the same card works
+for every machine, and the other machines see no difference at all.
 
 - With another esxDOS version in `boot1.rom`, the DivMMC has no esxDOS on the TC2068 (only the card ports).
   `boot1.rom` and the card's `ESXDOS.SYS` must be the same 0.8.9 (the official core already asks for them to match).
 - `LOAD ""` with a TAP opened by `.tapein`: while esxDOS is on (and no tape is loaded from F12), the EXROM
   LD-BYTES enters the esxDOS tape handling (JP 0562 at 0108, and the return through 0030, which was free in the
   EXROM).
-- A 32K `boot2.rom` with the Kairos ESX2068 after the EXROM works too; that one looks for `/SYS/ESXD68.SYS`.
 
 ## The TC2068 in this core
 
@@ -76,7 +74,7 @@ card works for every machine, and the other machines see no difference at all.
   AY. Joysticks on register 14: A8 = joystick 1, A9 = joystick 2, active low; bit 0 up, 1 down, 2 left,
   3 right, 7 fire.
 - No 7FFD, TR-DOS, +D, Multiface or Gluk ROM.
-- DivMMC with the traps of the Kairos TC2068 mode: 0000, 0066 and 3Dxx always; 0008 and 0038 only with HOME at
+- DivMMC with traps adapted to the TC2068: 0000, 0066 and 3Dxx always; 0008 and 0038 only with HOME at
   0000–1FFF; 04C6 never; 0562 only right after an M1 at 0108 with the EXROM.
 - Savestates do not keep F4 or FF: they only save with F4 at 0 and come back in the normal video mode.
 
@@ -96,7 +94,7 @@ download. It is the Sinclair Spectrum ROM, now Amstrad's, with Timex's changes:
   ([README.copyright](https://k1.spdns.de/Develop/Projects/zxsp/Media/Roms/README.copyright)); the TS2068 one has
   the same origin.
 
-The esxDOS changes were made and checked with this ROM (on Kairos and in the emulator). The `.mif` is made with
+The esxDOS changes were made and checked with this ROM. The `.mif` is made with
 `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
 
 **esxDOS does not come with the core.** Download the esxDOS 0.8.9 package from [esxdos.org](https://www.esxdos.org), as
