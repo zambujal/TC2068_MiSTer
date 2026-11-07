@@ -7,11 +7,11 @@ Sorgelig and others) with the **Timex Computer TC2068** as its main machine. The
 (Spectrum 48K, 128K, +2A/+3, Pentagon, Profi, Scorpion) are still there; what the official core does is in
 [README_ZX-Spectrum.md](README_ZX-Spectrum.md).
 
-Status: testing (November 2026). It boots in simulation; not yet tried on a MiSTer.
+Status: testing (November 2026); tried on a MiSTer (DE10-Nano with SDRAM).
 
 ## What goes on the MiSTer SD card
 
-- `TC2068.rbf` → `_Computer/`
+- `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → `_Computer/`; the date in the name is the one the menu shows
 - folder `games/TC2068/`:
 
 | File | What it is | Where to get it |
@@ -19,6 +19,7 @@ Status: testing (November 2026). It boots in simulation; not yet tried on a MiST
 | `boot1.rom` | esxDOS 0.8.9 (`ESXMMC.BIN`, 8192 bytes), for the DivMMC | the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org) (the same one the official core asks for) |
 | `boot.rom` | ROMs of the other machines (48K, 128K, +3, TR-DOS, +D…) | `releases/boot.rom` in this repository (the official core's one), or the `games/Spectrum/boot.rom` you already have |
 | `boot2.rom` | (optional) another ROM for the TC2068, instead of the one in the core | below |
+| a VHD (`.vhd`) | (optional) the DivMMC card: the `BIN`, `SYS` and `TMP` folders of esxDOS 0.8.9 | made from the esxDOS package, as for the official core; the secondary SD card of the I/O board can be used instead |
 
 The **2068 ROM is inside the core** (why, below): with no files at all the TC2068 boots. Without `boot1.rom`
 there is no esxDOS; without `boot.rom` there are no other machines.
@@ -42,9 +43,11 @@ esxDOS on the TC2068 (below) was only made and checked with the ROM in the core.
 - **Joysticks:** MiSTer's two joysticks are the TC2068's two (BASIC `STICK`); Kempston is there too.
 - **Sound:** the TC2068 AY, TurboSound (two AY on the 128K ports), General Sound and the beeper.
 - **Video:** the TC2068 modes (second screen, hi-colour, hi-res 512×192) and ULAplus.
-- **DivMMC:** F12 → Hardware → MMC Mode (Auto = only with a VHD selected; SD Card = the secondary SD card). The
-  card (or the VHD) takes the `BIN`, `SYS` and `TMP` folders of the esxDOS 0.8.9 package, as with the official
-  core; nothing else is needed. **F11** is NMI: it opens the esxDOS browser, as in the other cores.
+- **DivMMC:** with MMC Mode (F12 → Hardware) on Auto, the default, the VHD is chosen in F12 → **Load DivMMC**;
+  with MMC Mode on SD Card, it is the secondary SD card. The DivMMC comes in at reset (**Ctrl+F11**): first the
+  esxDOS boot, then the 2068 one. The VHD (or the card) takes the `BIN`, `SYS` and `TMP` folders of the esxDOS 0.8.9
+  package, as with the official core; nothing else is needed. **F11** is NMI: it opens the esxDOS browser, as in
+  the other cores.
 
 ## esxDOS on the TC2068
 
@@ -105,6 +108,11 @@ Processing → Start Compilation. The result is `output_files/TC2068.rbf`. `sys/
 for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
 `rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and `rtl/tc2068.mif` and
 `tools/rom2mif.py` are added.
+
+With Quartus Lite 25.1 timing is met (November 2026: +0.5 ns setup slack on the 112 MHz clock). For that, also for
+the other machines: the copy of banks 5 and 7 for the video (the VRAM) is written a clock later, through a register;
+and `ZX-Spectrum.sdc` gives two clocks to the paths that start at what only changes with an OUT (the TC2068 ports #F4
+and #FF, the DivMMC #E3) and at the Z80 refresh signal on the way to the SDRAM.
 
 ## Credits
 

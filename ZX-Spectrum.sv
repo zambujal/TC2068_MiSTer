@@ -518,14 +518,17 @@ reg         ram_rd;
 wire  [7:0] ram_dout;
 wire        ram_ready;
 
-// boot.rom -> 0x150000, boot1.rom (ESXMMC) -> 0x14C000, boot2.rom (TC2068) -> 0x140000
+// boot.rom -> 0x150000, boot1.rom (ESXMMC) -> 0x14C000, boot2.rom (TC2068) -> 0x140000; the ESX2068 of a 32K boot2.rom
+// (its last 8K) goes over boot1.rom at 0x14C000, so the DivMMC ROM is page 3 in every machine
 reg [24:0] load_addr;
 always @(posedge clk_sys) load_addr <= ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 :
-                                                     (ioctl_index[7:6] == 2) ? 25'h140000 : ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
+                                                     (ioctl_index[7:6] == 2) ? ((ioctl_addr[14:13] == 2'b11) ? 25'h146000 : 25'h140000) :
+                                                     ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
 
 // boot2.rom: the TC2068 ROM (24 KB), with ESX2068 when it has 32 KB; at most 32 KB is written
 wire dl_tmx      = ioctl_download && (ioctl_index == 8'h80);
-wire dl_tmx_over = dl_tmx && |ioctl_addr[24:15];
+reg  dl_tmx_over = 0;                       // registered like load_addr (hps_io sets ioctl_addr a clock before ioctl_wr)
+always @(posedge clk_sys) dl_tmx_over <= dl_tmx && |ioctl_addr[24:15];
 reg  tmx_rom_ok = 0;
 reg  tmx_esx_ok = 0;
 always @(posedge clk_sys) begin
@@ -547,25 +550,16 @@ always_comb begin
 		'b01XX_X_XX: ram_addr = load_addr;
 		'b001X_X_XX: ram_addr = tape_addr;
 		'b0001_X_XX: ram_addr = { 4'b1000, mmc_ram_bank,                                     addr[12:0]};
-		'b0000_0_00: ram_addr = dan_rom ? { 6'b100000, dan_page, addr[13:0] } : scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, addr[13:0] } : { 3'b110, page_rom, addr[13:0] })
-		                              : { 3'b101, page_rom, addr[13:0] }; //ROM (scorp: RAM bank 0 / Scorpion ROM window)
-		'b0000_0_01: ram_addr = scorp ? { 1'b0, 4'd5, addr[13:0] } : { 4'b0000, 3'd5, addr[13:0] }; // #4000: bank 5 fixed (screen)
-		'b0000_0_10: ram_addr = scorp ? { 1'b0, 4'd2, addr[13:0] } : { 4'b0000, 3'd2, addr[13:0] }; // #8000: bank 2 fixed
-		'b0000_0_11: ram_addr = { 1'b0, (scorp ? {1'b0, scorp_page} : page_ram), addr[13:0]};          // #C000: paged bank
-		'b0000_1_00: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b00, addr[13:0]}; //Special page modes
-		'b0000_1_01: ram_addr = { 4'b0000, |page_reg_plus3[2:1], &page_reg_plus3[2:1], 1'b1, addr[13:0]};
-		'b0000_1_10: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b10, addr[13:0]};
-		'b0000_1_11: ram_addr = { 4'b0000, ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, addr[13:0]};
+		'b0000_0_00: ram_addr = (dan_rom & ~tmx_mode) ? { 6'b100000, dan_page, a14 } : scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, a14 } : { 3'b110, page_rom, a14 })
+		                              : { 3'b101, page_rom, a14 }; //ROM (scorp: RAM bank 0 / Scorpion ROM window; TC2068: see tmx_exr)
+		'b0000_0_01: ram_addr = tmx_exr ? tmx_exrom : scorp ? { 1'b0, 4'd5, a14 } : { 4'b0000, 3'd5, a14 }; // #4000: bank 5 fixed (screen)
+		'b0000_0_10: ram_addr = tmx_exr ? tmx_exrom : scorp ? { 1'b0, 4'd2, a14 } : { 4'b0000, 3'd2, a14 }; // #8000: bank 2 fixed
+		'b0000_0_11: ram_addr = tmx_exr ? tmx_exrom : { 1'b0, (scorp ? {1'b0, scorp_page} : page_ram), a14};          // #C000: paged bank
+		'b0000_1_00: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b00, a14}; //Special page modes
+		'b0000_1_01: ram_addr = { 4'b0000, |page_reg_plus3[2:1], &page_reg_plus3[2:1], 1'b1, a14};
+		'b0000_1_10: ram_addr = { 4'b0000, |page_reg_plus3[2:1],                      2'b10, a14};
+		'b0000_1_11: ram_addr = { 4'b0000, ~page_reg_plus3[2] & page_reg_plus3[1],    2'b11, a14};
 	endcase
-
-	// TC2068: the DivMMC ROM is ESX2068 (or boot1.rom, patched in cpu_din), an 8K chunk with its #F4 bit set is the EXROM (or the empty
-	// DOCK: cpu_din gives #FF), and 0000-3FFF is the HOME ROM; the DivMMC RAM is above (mmc_ram_en)
-	if(tmx_mode & ~snap_reset & ~load & ~tape_req & ~mmc_ram_en) begin
-		if(mmc_rom_en & ~addr[15] & ~addr[14]) ram_addr = tmx_esx_ok ? { 3'b101, 4'd1, 1'b1, addr[12:0] }  // ESX2068
-		                                                          : { 3'b101, 4'd3,       addr[13:0] }; // boot1.rom
-		else if(tmx_ext)                       ram_addr = { 3'b101, 4'd1, 1'b0, addr[12:0] }; // EXROM / DOCK
-		else if(~addr[15] & ~addr[14])         ram_addr = { 3'b101, 4'd0,       addr[13:0] }; // HOME ROM
-	end
 
 	casex({snap_reset, load, tape_req})
 		'b1XX: ram_din = snap_data;
@@ -607,13 +601,25 @@ sdram ram
 );
 
 wire vram_we = (ram_addr[24:16] == 1) & ram_addr[14];
+
+// the copy of banks 5 and 7 for the video is written a clock later (registered): its write enable comes through the whole
+// memory map, and from there to the write enable of every M10K block of it was too long for one clock
+reg [14:0] vram_wa;
+reg  [7:0] vram_wd;
+reg        vram_wr = 0;
+always @(posedge clk_sys) begin
+	vram_wa <= {ram_addr[15], ram_addr[13:0]};
+	vram_wd <= ram_din;
+	vram_wr <= ram_we & vram_we;
+end
+
 dpram #(.ADDRWIDTH(15)) vram
 (
 	.clock(clk_sys),
 
-	.address_a({ram_addr[15], ram_addr[13:0]}),
-	.data_a(ram_din),
-	.wren_a(ram_we & vram_we),
+	.address_a(vram_wa),
+	.data_a(vram_wd),
+	.wren_a(vram_wr),
 
 	.address_b(vram_addr),
 	.q_b(vram_dout)
@@ -654,6 +660,8 @@ always_comb begin
 		if(scorp_1ffd[1]) page_rom <= 4'd2;                        // ROM2 Shadow Service Monitor
 		else if(trdos_en) page_rom <= 4'd3;                        // TR-DOS ROMCS
 		else              page_rom <= {3'b000, page_reg[4]};       // 0=BASIC128 1=48K
+	end else if(tmx_mode) begin                                    // TC2068 (see tmx_exr)
+		page_rom <= mmc_rom_en ? 4'b0011 : {3'b000, tmx_exr};      // boot1.rom or ESX2068 / EXROM (A13 = 0) / HOME ROM
 	end else begin
 		casex({mmc_rom_en, shadow_rom, trdos_en, plusd_mem, mf128_mem, plus3})
 			'b1XXXXX: page_rom <=   4'b0011; //esxdos
@@ -749,6 +757,16 @@ reg  [7:0] tmx_dec;                                 // #FF: the ULA keeps bits 5
 wire       tmx_ext     = tmx_mode & tmx_hsr[addr[15:13]] & ~ss_active;  // this chunk is EXROM/DOCK
 wire       tmx_dock_rd = tmx_ext & ~tmx_dec[7] & ~mmc_rom_en & ~mmc_ram_en;
 wire       tmx_exlo    = tmx_mode & tmx_hsr[0] & tmx_dec[7];            // EXROM at 0000-1FFF (DivMMC traps)
+
+// The memory map (ram_addr) of the TC2068 is in the core's own one, so that the DivMMC signals take no longer than in the other
+// machines: the DivMMC RAM comes first (mmc_ram_en); at 0000-3FFF page_rom gives the DivMMC ROM (page 3: boot1.rom, patched in
+// cpu_din, or the ESX2068 of a 32K boot2.rom), the EXROM at 0x144000 when the chunk has its #F4 bit set (or the empty DOCK:
+// cpu_din gives #FF), or the HOME ROM (page 0); above 3FFF a chunk with its #F4 bit set is the EXROM too. The EXROM is 8K,
+// so A13 is 0 in its chunks: a14 is addr[13:0] with that, in every case (in the other machines it is just addr[13:0]).
+// (No ss_active here: the savestate ram_addr comes after it, and savestates only run with #F4 at 0.)
+wire        tmx_exr   = tmx_mode & tmx_hsr[addr[15:13]];
+wire [13:0] a14       = { addr[13] & ~tmx_exr, addr[12:0] };
+wire [24:0] tmx_exrom = { 3'b101, 4'd1, a14 };
 
 always @(posedge clk_sys) begin
 	reg old_wr;

@@ -83,5 +83,19 @@ set_false_path -from {emu|p1024}
 set_false_path -from {emu|pf1024}
 set_false_path -from {emu|hps_io|status[*]}
 
-# TC2068 mode: chosen at reset only
+# TC2068 mode: chosen at reset only; the boot1.rom/boot2.rom flags only change while the ROMs load (the CPU is in reset)
 set_false_path -from {emu|tmx_mode}
+set_false_path -from {emu|tmx_rom_ok emu|tmx_esx_ok emu|esx089}
+
+# TC2068 #F4/#FF: they only change with an OUT, and the next memory access comes several clocks later
+set_multicycle_path -from {emu|tmx_hsr* emu|tmx_dec*} -setup 2
+set_multicycle_path -from {emu|tmx_hsr* emu|tmx_dec*} -hold 1
+
+# DivMMC #E3 (conmem, mapram, sram_page): the same, they only change with an OUT
+set_multicycle_path -from {emu|divmmc|conmem* emu|divmmc|mapram* emu|divmmc|sram_page*} -setup 2
+set_multicycle_path -from {emu|divmmc|conmem* emu|divmmc|mapram* emu|divmmc|sram_page*} -hold 1
+
+# RFSH_n (it keeps the DivMMC off during the refresh) changes at T1, a clock before the next read request, which the SDRAM
+# takes a clock later still, and at T3 of M1, where no read or write follows; nothing is ever written while it changes
+set_multicycle_path -from {emu|cpu|u0|RFSH_n*} -to {emu|ram|* emu|vram_w*} -setup 2
+set_multicycle_path -from {emu|cpu|u0|RFSH_n*} -to {emu|ram|* emu|vram_w*} -hold 1
