@@ -17,6 +17,11 @@ Fonte de 2026-11-07, etapa 1 (sem a FDD3000). Ainda nao testado no MiSTer.
     boot1.rom  o ESXMMC.BIN (o esxDOS; o mesmo do cartao do Kairos, SYS/ROMS/ESXMMC.BIN)
     boot2.rom  o 2068.rom do cartao do Kairos (BIN/2068.rom): 24K (HOME + EXROM), ou 32K com o ESX2068 a
                seguir (da' o esxDOS no TC2068)
+  As ROMs do TC2068 tambem vem com o Fuse (pasta roms): tc2068-0.rom (HOME, 16K) e tc2068-1.rom (EXROM,
+  8K); as do TS2068 sao ts2068-0.rom e ts2068-1.rom. O boot2.rom e' as duas juntas, por esta ordem:
+    Windows:  copy /b tc2068-0.rom + tc2068-1.rom boot2.rom
+    Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
+  (para o esxDOS no TC2068 junta-se o ESX2068.BIN no fim: copy /b tc2068-0.rom + tc2068-1.rom + ESX2068.BIN boot2.rom)
 - Liga como Timex TC2068: e' o primeiro da lista em F12 -> Hardware -> Memory (depois de mudar a maquina:
   Reset & Apply). Alt+F7 tambem passa para o TC2068; Alt+F1..F6 sao os outros, como no core oficial.
 - Sem o boot2.rom (ou com menos de 24K) o TC2068 arranca como um Spectrum 48K.
