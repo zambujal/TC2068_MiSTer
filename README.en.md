@@ -11,18 +11,19 @@ Status: testing (November 2026); tried on a MiSTer (DE10-Nano with SDRAM).
 
 ## What goes on the MiSTer SD card
 
-- `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → `_Computer/`; the date in the name is the one the menu shows
-- folder `games/TC2068/`:
+The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068 needs to boot:
 
-| File | What it is | Where to get it |
+- `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → folder `_Computer/`. The date in the name is the one
+  the menu shows.
+
+Everything else is optional and goes in the folder `games/TC2068/`:
+
+| File | What for | Where to get it |
 |---|---|---|
-| `boot1.rom` | esxDOS 0.8.9 (`ESXMMC.BIN`, 8192 bytes), for the DivMMC | the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org) (the same one the official core asks for) |
-| `boot.rom` | ROMs of the other machines (48K, 128K, +3, TR-DOS, +D…) | `releases/boot.rom` in this repository (the official core's one), or the `games/Spectrum/boot.rom` you already have |
-| `boot2.rom` | (optional) another ROM for the TC2068, instead of the one in the core | below |
-| a VHD (`.vhd`) | (optional) the DivMMC card: the `BIN`, `SYS` and `TMP` folders of esxDOS 0.8.9 | made from the esxDOS package, as for the official core; the secondary SD card of the I/O board can be used instead |
-
-The **2068 ROM is inside the core** (why, below): with no files at all the TC2068 boots. Without `boot1.rom`
-there is no esxDOS; without `boot.rom` there are no other machines.
+| `boot1.rom` | esxDOS: it is the DivMMC ROM | `ESXMMC.BIN` from the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org), renamed to `boot1.rom` (the official core asks for the same) |
+| a VHD (`.vhd`) | the DivMMC card, with the `BIN`, `SYS` and `TMP` folders of the same esxDOS package | made from the esxDOS package, as for the official core; the secondary SD card of the I/O board can be used instead |
+| `boot.rom` | only for the other machines of the core (48K, 128K, +3, TR-DOS, +D…); the TC2068 does not need it | the one of the official ZX-Spectrum core: `releases/boot.rom` in this repository, or `games/Spectrum/boot.rom` if the official core is already on the card |
+| `boot2.rom` | another ROM for the TC2068, instead of the one in the core | below |
 
 `boot2.rom` is for using another ROM: 24K (HOME 16K + EXROM 8K). For example the Portuguese TC2068 one that
 comes with the [Fuse](https://fuse-emulator.sourceforge.net) emulator (`roms` folder), HOME first, then EXROM:
