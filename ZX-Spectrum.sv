@@ -784,13 +784,16 @@ wire [7:0] tmx_io_dout = (addr[7:0] == 8'hF4) ? tmx_hsr :
 
 
 ////////////////////  ULA PORT  ///////////////////
+// the TC2068 decodes #FE with the whole low byte (#F4 and #F6 are even too: no border or beeper there)
+wire      ula_port = ~addr[0] & (~tmx_mode | (addr[7:0] == 8'hFE));
+
 reg [2:0] border_color = 3'b000;   // Scorpion reads this before write
 reg       ear_out;
 reg       mic_out;
 
 always @(posedge clk_sys) begin
 	if(reset) {ear_out, mic_out} <= 2'b00;
-	else if(io_wr & ~addr[0]) begin
+	else if(io_wr & ula_port) begin
 		border_color <= cpu_dout[2:0];
 		ear_out <= cpu_dout[4]; 
 		mic_out <= cpu_dout[3];
@@ -1541,7 +1544,7 @@ smart_tape tape
 	.tape_mode(ioctl_index[7:6]),
 
 	.m1(~nM1 & ~nMREQ),
-	.ula_rd(io_rd & ~addr[0]),
+	.ula_rd(io_rd & ula_port),
 	.reg_b(cpu_reg[95:88]),
 	.rom_en(active_48_rom & ~ss_active & ~tmx_mode), // the TC2068 loads from its EXROM: no traps
 	.dout_en(tape_dout_en),
