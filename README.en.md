@@ -21,7 +21,7 @@ Everything else is optional and goes in the folder `games/TC2068/`:
 | File | What for | Where to get it |
 |---|---|---|
 | `boot1.rom` | esxDOS: it is the DivMMC ROM | `ESXMMC.BIN` from the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org), renamed to `boot1.rom` (the official core asks for the same) |
-| a VHD (`.vhd`) | the DivMMC card, with the `BIN`, `SYS` and `TMP` folders of the same esxDOS package | made from the esxDOS package, as for the official core; the secondary SD card of the I/O board can be used instead |
+| a VHD (`.vhd`) | the DivMMC card, with the `BIN`, `SYS` and `TMP` folders of the same esxDOS package | made with `tools/faz_vhd.py` (below, "Making the esxDOS VHD"); the secondary SD card of the I/O board can be used instead |
 | `boot.rom` | only for the other machines of the core (48K, 128K, +3, TR-DOS, +D…); the TC2068 does not need it | the one of the official ZX-Spectrum core: `releases/boot.rom` in this repository, or `games/Spectrum/boot.rom` if the official core is already on the card |
 | `boot2.rom` | another ROM for the TC2068, instead of the one in the core | below |
 
@@ -34,6 +34,32 @@ Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
 ```
 
 esxDOS on the TC2068 (below) was only made and checked with the ROM in the core.
+
+## Making the esxDOS VHD
+
+[`tools/faz_vhd.py`](tools/faz_vhd.py) makes `boot1.rom` and the VHD from the esxDOS 0.8.9 package, on Windows and
+on Linux:
+
+1. Download the esxDOS 0.8.9 package from [esxdos.org](https://www.esxdos.org). It is a zip; there is no need to
+   unzip it.
+2. Download [`faz_vhd.py`](tools/faz_vhd.py) (on the file's page, the **Download raw file** button).
+3. Run it:
+   - **Windows:** install Python 3 from [python.org](https://www.python.org/downloads/) (with the default options)
+     and double-click `faz_vhd.py`. A window opens: in "esxDOS 0.8.9 package" choose the zip (**Zip...** button)
+     and press **Make**.
+   - **Linux:** `python3 faz_vhd.py` opens the same window (it needs tkinter: `sudo dnf install python3-tkinter` on
+     Fedora, `sudo apt install python3-tk` on Debian/Ubuntu). Without a window: `python3 faz_vhd.py esxdos089.zip`
+     (the name of the zip that was downloaded; `-h` shows the options).
+4. Two files come out, in a `TC2068` folder next to the zip:
+   - `boot1.rom`: the `ESXMMC.BIN` of the package, the DivMMC ROM;
+   - `esxdos089.vhd`: a 128 MB card (FAT32) with the `BIN`, `SYS` and `TMP` folders of the package.
+
+   Both go to `games/TC2068/` on the MiSTer SD card.
+5. In the TC2068 core: F12 → **Load DivMMC** → `esxdos089.vhd`, then **Ctrl+F11**.
+
+In the window (or with `-e folder`) an **extra folder** can be chosen to go on the VHD too, for example games as TAP,
+to open with `.tapein` or with the esxDOS browser (F11). The VHD size goes from 64 MB to 2 GB (`-s`). The program
+warns if `ESXMMC.BIN` or `ESXDOS.SYS` are not from esxDOS 0.8.9: on the TC2068 the core only patches that version.
 
 ## Using it
 
@@ -112,8 +138,8 @@ table of the bytes to swap, not esxDOS itself.
 Quartus Prime Lite 17.0.2 (the MiSTer one) or Lite 25.1 (with Cyclone V support): open `TC2068.qpf` and
 Processing → Start Compilation. The result is `output_files/TC2068.rbf`. `sys/sys.qip` picks `sys/pll_q<version>.qip`
 for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
-`rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and `rtl/tc2068.mif` and
-`tools/rom2mif.py` are added.
+`rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and `rtl/tc2068.mif`,
+`tools/rom2mif.py` and `tools/faz_vhd.py` are added.
 
 With Quartus Lite 25.1 timing is met (November 2026: +0.5 ns setup slack on the 112 MHz clock). For that, also for
 the other machines: the copy of banks 5 and 7 for the video (the VRAM) is written a clock later, through a register;
