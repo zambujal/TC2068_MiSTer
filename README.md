@@ -3,9 +3,9 @@
 *In English: [README.en.md](README.en.md)*
 
 O core **ZX-Spectrum** oficial do MiSTer ([MiSTer-devel](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer), de
-Sorgelig e outros) com o **Timex Computer TC2068** como máquina principal. As máquinas do core oficial (Spectrum
-48K, 128K, +2A/+3, Pentagon, Profi, Scorpion) continuam lá; o que o core oficial faz está em
-[README_ZX-Spectrum.md](README_ZX-Spectrum.md).
+Sorgelig e outros) com o **Timex Computer TC2068** como máquina principal. As outras máquinas (Spectrum 48K, 128K,
++2A/+3, Pentagon, Profi, Scorpion) ficaram no código, mas para elas usa-se o core oficial: este repositório não traz
+as ROMs delas. O que o core oficial faz está em [README_ZX-Spectrum.md](README_ZX-Spectrum.md).
 
 Estado: em teste (Novembro de 2026); experimentado num MiSTer (DE10-Nano com SDRAM).
 
@@ -20,24 +20,26 @@ O resto é opcional e vai na pasta `games/TC2068/`:
 
 | Ficheiro | Para quê | Onde se vai buscar |
 |---|---|---|
-| `boot1.rom` | o esxDOS: é a ROM da DivMMC | o `ESXMMC.BIN` do pacote do esxDOS 0.8.9, em [esxdos.org](https://www.esxdos.org), com o nome mudado para `boot1.rom` (é o que o core oficial também pede) |
-| uma VHD (`.vhd`) | o cartão da DivMMC, com as pastas `BIN`, `SYS` e `TMP` do mesmo pacote do esxDOS | faz-se com o `tools/faz_vhd.py` (em baixo, "Fazer a VHD do esxDOS"); em vez dela pode servir o segundo cartão SD da placa de I/O |
-| `boot.rom` | só para as outras máquinas do core (48K, 128K, +3, TR-DOS, +D…); o TC2068 não precisa dele | é o do core ZX-Spectrum oficial: `releases/boot.rom` deste repositório, ou o `games/Spectrum/boot.rom` se o core oficial já estiver no cartão |
-| `boot2.rom` | outra ROM para o TC2068, em vez da que vem no core | em baixo |
+| `boot1.rom` | o esxDOS: é a ROM da DivMMC | o `ESXMMC.BIN` do pacote do esxDOS 0.8.9, em [esxdos.org](https://www.esxdos.org), com o nome mudado para `boot1.rom`; o `tools/faz_vhd.py` faz isso (em baixo, "Fazer a VHD do esxDOS") |
+| uma VHD (`.vhd`) | o cartão da DivMMC, com as pastas `BIN`, `SYS` e `TMP` do mesmo pacote do esxDOS | faz-se com o `tools/faz_vhd.py`; em vez dela pode servir o segundo cartão SD da placa de I/O |
+| `boot2.rom` | outra ROM do TC2068, em vez da que vem no core; normalmente não é precisa | em baixo |
 
-A pasta `releases/` deste repositório só tem o core do TC2068 e o `boot.rom`. Os outros ficheiros que o core oficial
-tem na pasta dele, como o `savestates.sav` (para o F12 → Savestate Disk) e o `dsdd720k.dsk.gz` (um disco DSDD vazio),
-estão em [MiSTer-devel/ZX-Spectrum_MISTer](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
+A ROM que vem no core é a do TS2068 tal como é, sem mudanças. Com o esxDOS ligado, o core troca alguns bytes da
+EXROM e do esxDOS enquanto os lê, sem mexer em nenhum ficheiro (em baixo, "O esxDOS no TC2068").
 
-O `boot2.rom` serve para usar outra ROM: 24K (HOME 16K + EXROM 8K). Por exemplo, a do TC2068 português que
-vem com o emulador [Fuse](https://fuse-emulator.sourceforge.net) (pasta `roms`), a HOME e depois a EXROM:
+O `boot2.rom` é só para quem quiser outra ROM de 24K (HOME 16K + EXROM 8K) em vez da do core. Por exemplo, a do
+TC2068 português que vem com o emulador [Fuse](https://fuse-emulator.sourceforge.net) (pasta `roms`), a HOME e depois
+a EXROM:
 
 ```
 Windows:  copy /b tc2068-0.rom + tc2068-1.rom boot2.rom
 Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
 ```
 
-O esxDOS no TC2068 (em baixo) só foi feito e visto com a ROM que o core traz.
+O esxDOS no TC2068 só foi feito e visto com a ROM que vem no core.
+
+A pasta [`releases/`](releases) só tem o core. Para o F12 → Savestate Disk, o core oficial tem um `savestates.sav` na
+[pasta releases dele](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
 
 ## Fazer a VHD do esxDOS
 
@@ -68,8 +70,8 @@ versão.
 
 ## Usar
 
-- **A máquina** escolhe-se em F12 → Hardware → **Memory**: o TC2068 é o primeiro da lista e o de origem; depois
-  de mudar, **Reset & Apply**. **Alt+F7** passa para o TC2068 (Alt+F1 a F6 são as do core oficial).
+- **A máquina:** o TC2068 é a de origem (F12 → Hardware → **Memory**, a primeira da lista; **Alt+F7**). As outras da
+  lista são as do core oficial e precisam das ROMs dele (o `boot.rom`): para elas usa-se o core oficial.
 - **Cassetes:** TAP, TZX, PZX e CSW pelo F12 (Load Tape) e `LOAD ""`. Tocam como som: o carregamento rápido do
   core oficial só existe para a ROM do 48K.
 - **Joysticks:** os dois do MiSTer são os dois do TC2068 (o `STICK` do BASIC); o Kempston também está.
