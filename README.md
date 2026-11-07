@@ -1,162 +1,80 @@
-# [ZX Spectrum](https://en.wikipedia.org/wiki/ZX_Spectrum) for MiSTer Platform
+# TC2068 para o MiSTer
 
-Some verilog models from Till Harbaum [Spectrum](https://github.com/mist-devel/mist-board/tree/master/cores/spectrum) core were used in this project.
+*In English: [README.en.md](README.en.md)*
 
-### Features:
-- Fully functional [ZX Spectrum 48K, 128K, +3](https://en.wikipedia.org/wiki/ZX_Spectrum) and [Pentagon 128](https://en.wikipedia.org/wiki/Pentagon_(computer)) with correct CPU and Video timings.
-- Scorpion ZS-256 (base model, Shadow Service Monitor via F11). Set Video Timings to Scorpion as well.
-- Pentagon 1024K and Profi 1024K memory interfaces.
-- Turbo 7MHz, 14MHz, 28MHz, 56MHz.
-- [ULA+ v1.1](https://sinclair.wiki.zxnet.co.uk/wiki/ULAplus) programmable palettes with extended Timex control.
-- Timex HiColor, HiRes modes.
-- TAP tape format with turbo (direct byte injection) and normal loading.
-- TZX and CSW tape formats with fast(16x) and normal loading.
-- PZX tape format with fast(16x) and normal loading.
-- Z80/SNA snapshot loading.
-- [TR-DOS](https://sinclair.wiki.zxnet.co.uk/wiki/TR-DOS_filesystem) (Beta Disk Interface) - TRD(read/write) and SCL(read-only) images.
-- [G+DOS](https://en.wikipedia.org/wiki/%2BD) (MGT +D Disk Interface) and IMG, MGT images (only in non +2A/+3 memory modes).
-- +3 Disk drive usable with +3DOS.
-- DivMMC with ESXDOS.
-- [Multiface 128 and Multiface 3](https://en.wikipedia.org/wiki/Multiface) (in +3 mode) add-on.
-- Memory snapshot save/load in +D and Multiface.
-- Kempston Mouse.
-- Joysticks: Kempston, Sinclair I/II, Cursor
-- [General Sound](https://8bit.yarek.pl/interface/zx.generalsound/index.html) with 512KB-2MB of RAM
-- [Turbosound-FM](http://speccy.info/TurboSound_FM) (dual YM2203 incl. dual YM2149)
-- SAA1099
-- Covox (8-bit DAC) on port #FB, #DD (Scorpion) or #5F/#3F stereo (Profi), disabled by default
+O core **ZX-Spectrum** oficial do MiSTer ([MiSTer-devel](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer), de
+Sorgelig e outros) com o **Timex Computer TC2068** como máquina principal. As máquinas do core oficial (Spectrum
+48K, 128K, +2A/+3, Pentagon, Profi, Scorpion) continuam lá; o que o core oficial faz está em
+[README_ZX-Spectrum.md](README_ZX-Spectrum.md).
 
-### Installation:
-Copy the *.rbf to the root folder, copy boot.rom to games/Spectrum/ on the SD card.
+Estado: em teste (Novembro de 2026). Arranca na simulação; ainda não foi experimentado num MiSTer.
 
-### Notes about supported formats:
-**TRD** is TR-DOS image used with Beta Disk Interface (BDI). To use TR-DOS you need to choose TRD image in OSD first. In 128K mode use menu to enter TR-DOS.
-In 48K mode use command **RANDOMIZE USR 15616** to enter TR-DOS. In +3 mode, enter to 48K mode from the +3 BASIC via the USR0 command,
-then issue **RANDOMIZE USR 15616**. Use command **RETURN** to leave TR-DOS.
+## O que vai no cartão do MiSTer
 
-**Note:** Not all TRD have autostart and it's cumbersome way to enter TR-DOS from 48K mode, there is GLUK ROM included. So insert TRD/SCL dosk and press **F11**, you will enter to GLUK menu, then choose **GLUK BOOT** where you can select the file to boot. That's all.
+- `TC2068.rbf` → `_Computer/`
+- pasta `games/TC2068/`:
 
-**IMG** is G+DOS image used with +D Disk interface. Although it's fully supported, i couldn't find any games on such disks. The main purpose of these images is to use snapshot function of +D and Multiface.
+| Ficheiro | O que é | Onde se vai buscar |
+|---|---|---|
+| `boot2.rom` | ROM do TC2068: HOME 16K + EXROM 8K (24576 bytes) | as duas ROMs do TC2068 do Fuse, juntas (em baixo) |
+| `boot1.rom` | esxDOS (`ESXMMC.BIN`, 8192 bytes), para a DivMMC | o pacote do esxDOS em [esxdos.org](https://www.esxdos.org) (o mesmo que o core oficial pede) |
+| `boot.rom` | ROMs das outras máquinas (48K, 128K, +3, TR-DOS, +D…) | `releases/boot.rom` deste repositório (é o do core oficial), ou o `games/Spectrum/boot.rom` que já tens |
 
-**MGT** is G+DOS and MasterDOS (SAM Coupe) image. It's similar to IMG but uses different layout. The main purpose is to transfer data to/from SAM Coupe.
+O `boot2.rom` são as duas ROMs do TC2068 que vêm com o emulador [Fuse](https://fuse-emulator.sourceforge.net)
+(pasta `roms`), a HOME e depois a EXROM:
 
-**DSK** +3 disk format. In none- +3 modes, +D tries to mount it, however +3 disk images are not compatible with G+DOS.
-The original +3 disk drive is a single-sided single-destiny drive, but this core supports double-sided double-destiny images, too.
-An empty [DSDD image](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases/dsdd720k.dsk.gz) is great for saving from Multiface.
-***Note:*** in +3 mode, both the Beta and the +3 disk drive are supported, but only one image can be mounted, so both cannot be used at the same time.
+```
+Windows:  copy /b tc2068-0.rom + tc2068-1.rom boot2.rom
+Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
+```
 
-**PZX** is the [Perfect ZX Tape](https://github.com/raxoft/pzxtools) format. It stores the tape as pulses, like TZX and CSW, thus it is played through the internal AUDIO IN loop and turbo (direct byte injection) loading is not available for it.
-Keys **F1** (pause/continue), **F2** (previous part) and **F3** (next part) work like with TAP: a part starts at every PULS block, at every DATA block which is not preceded by a PULS block and at every BRWS browse point. A STOP block pauses the playback.
+As do TS2068 (`ts2068-0.rom` e `ts2068-1.rom`) também servem. A
+[página do TC2068 no Spectrum Computing](https://spectrumcomputing.co.uk/entry/1000507) liga para a colecção de
+ROMs do Phil Kendall, o autor do Fuse.
 
-**TAP** is simple tape dump format. It is possible to use normal and **turbo** loading (only if application uses standard loading routines from ROM). To load in turbo mode, you need to choose TAP file in OSD **first** and then start to load app through menu (128K) or by command **LOAD ""** (48K, 128K). To load TAP file in normal mode through internal AUDIO IN loop, you need to start loading through menu or command **first** and then choose TAP file though OSD. If application uses non-standard loader, then TAP file will be played in normal mode automatically. Thus it's safe to always choose the turbo mode. Some applications are split into several parts inside one TAP file. For example DEMO apps where each part is loaded after finish of previous part, or games loading levels by requests. The core pauses the TAP playback after each code part (flag=#255). If application uses standard loader from ROM, then everything will be handled automatically and unnoticeable. If app uses non-standard loader, then there is no way to detect the loading. In this case you need to press **F1 key** to continue/pause TAP playback. Do not press F1 key while data is loading (or you will have to reset and start from beginning). To help operate with TAP (for non-standard loaders) there is special yellow LED signaling:
-- LED is ON: more data is available in TAP file.
-- LED is flashing: loading is in process.
-- LED is OFF: no more data left in TAP file.
+Sem o `boot2.rom` o TC2068 arranca como um Spectrum 48K. Sem o `boot1.rom` não há esxDOS.
 
-In normal mode, while TAP loading, the following keys can be used:
-- F1 - pause/continue
-- F2 - jump to previous part (if pressed while pilot tone), or beginning of current part (if pressed while code is transferring).
-- F3 - skip to next part
+## Usar
 
-If game uses non-standard loader, then loading usually paused after loading of first part. Press **F1** to continue loading.
+- **A máquina** escolhe-se em F12 → Hardware → **Memory**: o TC2068 é o primeiro da lista e o de origem; depois
+  de mudar, **Reset & Apply**. **Alt+F7** passa para o TC2068 (Alt+F1 a F6 são as do core oficial).
+- **Cassetes:** TAP, TZX, PZX e CSW pelo F12 (Load Tape) e `LOAD ""`. Tocam como som: o carregamento rápido do
+  core oficial só existe para a ROM do 48K.
+- **Joysticks:** os dois do MiSTer são os dois do TC2068 (o `STICK` do BASIC); o Kempston também está.
+- **Som:** o AY do TC2068, o TurboSound (dois AY nas portas do 128K), o General Sound e o beeper.
+- **Vídeo:** os modos do TC2068 (segundo ecrã, hi-colour, hi-res 512×192) e o ULAplus.
+- **DivMMC:** F12 → Hardware → MMC Mode (Auto = só com uma VHD escolhida; SD Card = o segundo cartão). No
+  TC2068 ainda não há esxDOS: o esxDOS normal chama rotinas da ROM do 48K e pendura com a do 2068. Nas outras
+  máquinas funciona como no core oficial.
 
-OSD option **Fast tape load** increases CPU frequency to 56MHz while tape loading.
+## O TC2068 neste core
 
-Use **F10** key to switch into 48K basic (won't lock 48K mode) and automatically enter **LOAD ""** if game/app doesn't load from 128K menu.
+- ROM HOME de 16K em 0000–3FFF e EXROM de 8K. A porta **F4** escolhe, para cada bloco de 8K, a HOME (0) ou a
+  EXROM/DOCK (1); a porta **FF**, no bit 7, a EXROM (1) ou o DOCK (0). O DOCK está vazio: lê FFh e não guarda o
+  que se escreve. FF bit 6 = 1 desliga a interrupção. A F4 e a FF lêem-se de volta.
+- A porta FE só responde ao endereço FE, como no 2068 (a F4 e a F6 também são pares).
+- AY em **F5** (registo) e **F6** (dados): é o segundo chip do TurboSound, por isso FFFD/BFFD continuam a dar os
+  dois AY. Joysticks no registo 14: A8 = joystick 1, A9 = joystick 2, activos a 0; bit 0 cima, 1 baixo,
+  2 esquerda, 3 direita, 7 fogo.
+- Sem 7FFD, TR-DOS, +D, Multiface nem a ROM do Gluk.
+- DivMMC com as traps do modo TC2068 do [Kairos](https://github.com/zambujal/Kairos): 0000, 0066 e 3Dxx sempre;
+  0008 e 0038 só com a HOME em 0000–1FFF; 04C6 nunca; 0562 só logo a seguir a um M1 em 0108 com a EXROM. O
+  firmware do esxDOS no TC2068 é o que vier a seguir à EXROM num `boot2.rom` de 32K; sem ele a DivMMC só tem
+  as portas do cartão.
+- Os savestates não guardam a F4 nem a FF: só gravam com a F4 a 0 e voltam no modo de vídeo normal.
 
-### Turbo modes
-You can control CPU speed by following keys:
-- F4 - normal speed (3.5MHz)
-- F5 - 7MHz
-- F6 - 14MHz
-- F7 - 28MHz
-- F8 - 56MHz
-- F9 - pause/continue
-Speed can be controlled from OSD as well.
+## Compilar
 
-Due to SDRAM speed limitation 28MHz and 56MHz speeds include wait states, so effective CPU speed is lower than nominal.
+Quartus Prime Lite 17.0.2 (o do MiSTer): abrir `TC2068.qpf` e Processing → Start Compilation. Sai
+`output_files/TC2068.rbf`. Em relação ao core oficial mudam `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
+`rtl/divmmc.v`, `ZX-Spectrum.sdc` e o projecto (`TC2068.qpf`, `.qsf`, `.srf`).
 
+## De quem é
 
-### Memory Configurations with extra RAM:
-- **Pentagon 512K** uses bits 6 and 7 in port 7FFD to access additional memory.
-- **Profi 1024K** uses bits 0-2 in port DFFD to access additional memory.
-
-### Mouse and Joystick:
-Kempston mouse has no strict convention which bit (D0 or D1) reflects a main button. Pick the mapping with the OSD Mouse option.
-The mouse and the Kempston joystick decoded separately (#xxDF for the mouse, #xx1F for the joystick) and both can be used at the same time.
-Scroll wheel is supported. Bits D4-D7 of #FADF hold a 4-bit wheel counter. OSD Mouse Wheel option can invert the direction.
-
-### Snapshots:
-Core supports snapshot functionality of +D. In order to use it, you need to mount IMG or MGT image. ROM includes preloaded G+DOS image, thus you can mount IMG/MGT at any time (even while playing the game). **Note #1**: preloaded G+DOS has been patched to allow disk change on-the-fly. So, if you will load G+DOS from disk, then be careful - it may corrupt previous saves if you will change the disk! **Note #2:** only one disk image can be mounted at any time. Thus make sure if you use game from TRD image, the game won't save anything later to its disk. 
-
-To save snapshot using +D (preferred way), press **F11 key**. You will see stripes on border and game will freeze. You can press following keys:
-- 3 - to save the screen.
-- 4 - to save 48K snapshot.
-- 5 - to save 128K snapshot.
-Original +D ROM requires to press additional Y/N keys in 128K mode to choose the correct screen buffer. Included ROM has been pre-patched to automatically detect the screen. So, just press 5 for 128K snapshot.
-
-To load snapshot, just mount IMG/MGT and go to basic prompt where type **CAT 1** to list its content. Note the number of snapshot file. Then type **LOAD pX** where X is the number of shapshot file. For other disk commands please find and read G+DOS (MGT +D) manual.
-
-### Multiface 128 and Multiface 3:
-You can enter Multiface ROM using **RShift+F11**. Multiface 128 includes preloaded debugger (Genie) where you can trace or modify the game.
-If you prefer to use bare Multiface 128 ROM then do following procedure: Press and hold **ESC**, then press **RShift+F11**.
-You will be able to use bare Multiface ROM by simple subsequent presses of **RShift+F11** till core reload. Multiface provides snapshot functionality by saving to IMG/MGT disks. Please find and read Multiface 128 manual.
-**Note:** Multiface 128 expose its port, thus if game has protection against Multiface, it won't work, unless you press (o)ff before you exit from the Multiface menu. Thus using +D snapshot is prefered.
-When using the Spectrum +2A/3 mode, the Multiface 3 is supported. There's no Genie for the +3, but there are useful toolkit routines in the stock ROM.
-
-### DivMMC
-Supported both VHD images and secondary SD card. Default **auto** mode makes DivMMC hidden til VHD image gets selected.
-You have to get ESXDOS package, rename **ESXMMC.BIN** to **boot1.rom** and place to **games/Spectrum/**
-Make sure boot1.rom and files inside VHD (or SD card) are from the same ESXDOS version.
-
-
-### Special Keys:
-- Ctrl+F11 - warm reset
-- Alt+F11 - cold reset will disk unload
-- Ctrl+Alt+F11 - reset to ROM0 menu
-- F10 - switch to Basic 48 (without 48K lock) and issue **LOAD""**
-- RShift+F10 - same as F10 with 48K lock
-- F11 - enter +D snapshot menu (or ROM0 menu if IMG/MGT not mounted) or DivMMC file browser.
-- F11 - in Scorpion ZS-256 mode: enter the Shadow Service Monitor (exit with the monitor's own exit routine).
-- RShift+F11 - enter Multiface 128 menu
-- F12 - OSD menu
-
-Quick switch between models:
-- Alt+F1 - ZX Spectrum 48K (48KB, ULA-48)
-- Alt+F2 - ZX Spectrum 128K (128KB/+2, ULA-128)
-- Alt+F3 - ZX Spectrum +3 (128KB +3, ULA-128)
-- Alt+F4 - Pentagon 48K (48KB, Pentagon)
-- Alt+F5 - Pentagon 128K (128KB, Pentagon)
-- Alt+F6 - Pentagon 1024K (1024KB, Pentagon)
-CPU speed will reset to original.
-
-### Download precompiled binaries and system ROMs:
-Go to [releases](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases) folder.
-
-### boot.rom Structure
-
-boot.rom is a collection of required ROMs, however it does not contain a full set of ROMs for each supported machine and/or hardware, it only includes the necessary subset.
-
-| N | Base Offset (Hex) | Chunk Size (Hex) | SHA1 Of the Original | Description |
-| ---: | ---: | ---: | :---: | :--- | 
-|  1 | 00000 | 4000 | 5f40f5af51c4c1e9083eac095349d7518545b0e0 | glukpen.rom Mr Gluk Boot Service version 6.61 |
-|  2 | 04000 | 4000 | ??? (doesn't match known 5.04t or 5.04t-bugfixed) | TR-DOS 5.04T |
-|  3 | 08000 | 4000 | d07fcdeca892ee80494d286ea9ea5bf3928a1aca | 128p-0.rom (128K editor and menu), the first half of the Pentagon 128 ROM |
-|  4 | 0C000 | 4000 | 80080644289ed93d71a1103992a154cc9802b2fa | 128-1.rom English 128 ROM 1 (48K BASIC) |
-|  5 | 10000 | 4000 | 62ec15a4af56cd1d206d0bd7011eac7c889a595d | plus3-4.1-english-0.rom English +2B/+3B v4.1 ROM 0 (128K editor) |
-|  6 | 14000 | 4000 | 1a7812c383a3701e90e88d1da086efb0c033ac72 | plus3-4.1-english-1.rom English +2B/+3B v4.1 ROM 1 (128K syntax checker) |
-|  7 | 18000 | 4000 | 8df145d10ff78f98138682ea15ebccb2874bf759 | plus3-4.1-english-2.rom English +2B/+3B v4.1 ROM 2 (+3DOS) |
-|  8 | 1C000 | 4000 | be365f331942ec7ec35456b641dac56a0dbfe1f0 | plus3-4.1-english-3.rom English +2B/+3B v4.1 ROM 3 (48K BASIC) |
-|  9 | 20000 | 2000 | 6b841dc5797ef7eb219ad455cd1e434ca3b9d30d | plusd-1.A.rom MGT's +D disk interface ROM v1.A |
-| 10 | 22000 | 2000 | **CUSTOM** | plusd-sys.bin MODIFIED version of the +D system code, based on the chunk CONFIG2 from "Plus D System Tape" |
-| 11 | 24000 | 2000 | 8df204ab490b87c389971ce0c7fb5f9cbd281f14 | mf128-87.2.rom (CRC32: 78ec8cfd) Miltuface 128 (87.2) |
-| 12 | 26000 | 2000 | 926425b3e84180683f0872aee9ebf6f4b9dfaf5f | genie128-2.rom GENIE 128K V2.1, the second half of the Genie 128 Disassembler ROM |
-| 13 | 28000 | 2000 | 5d74d2e2e5a537639da92ff120f8a6d86f474495 | mf3-3.C.rom (CRC32: 2d594640) Multiface 3 (3.C) |
-| 14 | 2A000 | 2000 | N/A | zeroes.bin unused 8K, padding for the MF3 ROM to fill remaining space in 16K block |
-| 15 | 2C000 | 4000 | 5ea7c2b824672e914525d1d5c419d71b84a426a2 | 48.rom BASIC for 16/48K models |
-| 16 | 30000 | 4000 | 477114ff0fe1388e0979df1423602b21248164e5 | Scorpion ZS-256 v2.94 ROM 0 (Scorpion BASIC 128) |
-| 17 | 34000 | 4000 | 367b5a102fb663beee8e7930b8c4acc219c1f7b3 | Scorpion ZS-256 v2.94 ROM 1 (48K BASIC) |
-| 18 | 38000 | 4000 | 5ecf853611870802b07527cdb78cae553adc761d | Scorpion ZS-256 v2.94 ROM 2 (Shadow Service Monitor) |
-| 19 | 3C000 | 4000 | a95e48399622e5b7cfda6aa724c5b1c62d892c97 | Scorpion ZS-256 v2.94 ROM 3 (TR-DOS 5.03) |
-
-With the Scorpion ROMs added boot.rom is 256 KB (was 192 KB). SHA256: `a64828d45e2e73501916e1bee7beb30f028aa4ea181a9a60720bdeef28ec2b40`. To rebuild it from a 192 KB release ROM: `python3 tools/build_boot_rom.py --base <boot.rom> -o boot.rom` (Scorpion ROMs: `tools/scorp294.rom`).
+- **O core ZX-Spectrum do MiSTer:** Sorgelig e outros (GPL; ver [README_ZX-Spectrum.md](README_ZX-Spectrum.md)
+  e os cabeçalhos dos ficheiros).
+- **O TC2068** (GPL, como o resto): António Vitor. Escrito com ajuda de IA (Claude).
+- **Sem ROMs nem esxDOS.** As ROMs do TC2068 vêm da ROM do Sinclair, que é da Amstrad; a Amstrad deixa
+  distribuí-las e as mudanças da Timex são de domínio público
+  ([nota das ROMs](https://k1.spdns.de/Develop/Projects/zxsp/Media/Roms/README.copyright)). O esxDOS é de
+  [esxdos.org](https://www.esxdos.org).
