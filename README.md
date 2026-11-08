@@ -191,7 +191,7 @@ da versão do Quartus: há o 17 e o 25 (igual ao 17). Em relação ao core ofici
 `rtl/turbosound.sv`, `rtl/divmmc.v`, `ZX-Spectrum.sdc`, o projecto (`TC2068.qpf`, `.qsf`, `.srf`) e juntam-se
 `rtl/tc2068.mif`, `tools/rom2mif.py` e `tools/faz_vhd.py`.
 
-No Quartus Lite 25.1 os tempos cumprem-se (Novembro de 2026: no relógio de 112 MHz, slack de setup de +0,5 ns). Para
+No Quartus Lite 25.1 os tempos cumprem-se (Novembro de 2026: no relógio de 112 MHz, slack de setup de +0,7 ns). Para
 isso, também para as outras máquinas: a cópia dos bancos 5 e 7 para o vídeo (a VRAM) é escrita um ciclo depois, por
 um registo; e o `ZX-Spectrum.sdc` dá dois ciclos aos caminhos que partem do que só muda com um OUT (as portas #F4 e
 #FF do TC2068, a #E3 da DivMMC) e do sinal de refresh do Z80 até à SDRAM.
