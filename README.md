@@ -168,6 +168,23 @@ O esxDOS no TC2068 só foi feito e visto com a ROM que vem no core.
 A pasta [`releases/`](releases) só tem o core. Para o F12 → Savestate Disk, o core oficial tem um `savestates.sav` na
 [pasta releases dele](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
 
+## O Z80 (T80)
+
+O core usa o T80. Há uma versão com o registo Q do Z80 da Zilog corrigido, a **T80Q**, que vai para `releases/` como
+`TC2068_T80Q_AAAAMMDD.rbf`, ao lado do `TC2068_AAAAMMDD.rbf`, que fica com o T80 do core oficial (o código da T80Q
+está no ramo [`t80q`](https://github.com/zambujal/TC2068_MiSTer/tree/t80q) até o `.rbf` sair).
+
+Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F) dependem da instrução anterior
+(descoberto em 2012; as variantes estão na
+[página de David Banks](https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags#scfccf)). Num Z80 da Zilog,
+se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. O T80 do core oficial só via se os flags
+*mudavam* de valor; o da T80Q vê se foram *escritos*, mesmo com o mesmo valor (o POP AF, o EX AF e o SET/RES não
+contam como escrita).
+
+Só se nota em programas que testam o Z80. Para comparar as duas versões, o [`tools/z80test/`](tools/z80test) tem o
+z80test 1.2a de Patrik Rak (Raxoft): o z80ccf testa os flags depois de um CCF a seguir a cada instrução. Este T80
+passa o z80full e o z80ccf noutro core.
+
 ## Compilar
 
 Quartus Prime Lite 17.0.2 (o do MiSTer) ou o Lite 25.1 (com o suporte do Cyclone V): abrir `TC2068.qpf` e

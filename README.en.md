@@ -170,6 +170,22 @@ esxDOS on the TC2068 was only made and checked with the ROM in the core.
 The [`releases/`](releases) folder only has the core. For F12 → Savestate Disk, the official core has a
 `savestates.sav` in its [releases folder](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
 
+## The Z80 (T80)
+
+The core uses the T80. There is a version with the Q register of the Zilog Z80, **T80Q**, which goes into
+`releases/` as `TC2068_T80Q_YYYYMMDD.rbf`, next to `TC2068_YYYYMMDD.rbf`, which keeps the official core's T80 (the T80Q
+code is in the [`t80q`](https://github.com/zambujal/TC2068_MiSTer/tree/t80q) branch until its `.rbf` is out).
+
+After SCF or CCF, the undocumented X and Y flags (bits 5 and 3 of F) depend on the previous instruction (found in
+2012; the variants are on [David Banks's page](https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags#scfccf)).
+On a Zilog Z80, if it wrote the flags, they come from A alone; if it did not, from A and F. The official core's T80
+only checked whether the flags *changed*; T80Q checks whether they were *written*, even with the same value (POP AF,
+EX AF and SET/RES do not count as a write).
+
+It only shows in programs that test the Z80. To compare the two versions, [`tools/z80test/`](tools/z80test) has
+Patrik Rak's (Raxoft) z80test 1.2a: z80ccf tests the flags after a CCF following each instruction. This T80 passes
+z80full and z80ccf in another core.
+
 ## Building
 
 Quartus Prime Lite 17.0.2 (the MiSTer one) or Lite 25.1 (with Cyclone V support): open `TC2068.qpf` and
