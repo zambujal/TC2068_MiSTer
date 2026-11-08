@@ -55,7 +55,8 @@ o DOCK lê FFh.
 
 Onde há cartuchos em `.dck`:
 
-- [Androids](https://timexsinclair.com/product/androids) (Timex, 1984): o jogo, com o link para o descarregar;
+- Androids (Timex, 1984): a [página do jogo](https://timexsinclair.com/product/androids) e o
+  [zip do cartucho](https://archive.org/download/timex-sinclair-software-archive/Androids%20%281984%29%28Timex%20Computer%20Corp%29%28TS2068%29%28US%29%28Cartridge%29.zip), com o `.dck` dentro;
 - [Spectrum Emulator](https://spectrumcomputing.co.uk/entry/4000071/Timex/Spectrum_Emulator) (TMX Portugal, 1985): o
   cartucho português com a ROM do TC2048;
 - [Zebra OS-64](https://spectrumcomputing.co.uk/entry/4000090/Timex/Zebra_OS64), e os outros cartuchos da Timex

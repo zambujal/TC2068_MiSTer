@@ -55,7 +55,8 @@ cartridge, the DOCK reads FFh.
 
 Where to find cartridges in `.dck`:
 
-- [Androids](https://timexsinclair.com/product/androids) (Timex, 1984): the game, with the download link;
+- Androids (Timex, 1984): the [game page](https://timexsinclair.com/product/androids) and the
+  [cartridge zip](https://archive.org/download/timex-sinclair-software-archive/Androids%20%281984%29%28Timex%20Computer%20Corp%29%28TS2068%29%28US%29%28Cartridge%29.zip), with the `.dck` inside;
 - [Spectrum Emulator](https://spectrumcomputing.co.uk/entry/4000071/Timex/Spectrum_Emulator) (TMX Portugal, 1985):
   the Portuguese cartridge with the TC2048 ROM;
 - [Zebra OS-64](https://spectrumcomputing.co.uk/entry/4000090/Timex/Zebra_OS64), and the other Timex cartridges
