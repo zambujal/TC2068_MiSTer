@@ -557,7 +557,8 @@ endfunction
 
 reg         dck_old_dl = 0, dck_hdr = 1, dck_bank0 = 0, dck_got = 0;
 reg   [3:0] dck_hc = 0;
-reg   [7:0] dck_img = 0;
+reg   [7:0] dck_img = 0;                    // chunks with an image (bank header: shifted in from the top)
+reg   [7:0] dck_on_s = 0, dck_ram_s = 0;   // the same for dock_on and dock_ram
 reg   [2:0] dck_chunk = 0;
 reg  [12:0] dck_off = 0;
 reg  [24:0] dck_old_a = 0;
@@ -582,21 +583,22 @@ always @(posedge clk_sys) begin
 		if(ioctl_wr) begin
 			if(dck_hdr) begin
 				if(!dck_hc) dck_bank0 <= !ioctl_dout;
-				else begin
-					dck_img[dck_hc - 1'd1] <= ioctl_dout[1];
-					if(dck_bank0) begin
-						dock_on[dck_hc - 1'd1]  <= |ioctl_dout[1:0];
-						dock_ram[dck_hc - 1'd1] <= ioctl_dout[0];
-					end
+				else begin                                     // chunk 0 ends in bit 0 (no computed index)
+					dck_img   <= {ioctl_dout[1], dck_img[7:1]};
+					dck_on_s  <= {|ioctl_dout[1:0], dck_on_s[7:1]};
+					dck_ram_s <= {ioctl_dout[0], dck_ram_s[7:1]};
 				end
 				dck_hc <= dck_hc + 1'd1;
-				if(dck_hc == 8) begin
-					m = {ioctl_dout[1], dck_img[6:0]};
-					if(dck_bank0) dck_got <= 1;
+				if(dck_hc == 8) begin                          // the last chunk: the shift above leaves m in dck_img
+					m = {ioctl_dout[1], dck_img[7:1]};
+					if(dck_bank0) begin
+						dock_on  <= {|ioctl_dout[1:0], dck_on_s[7:1]};
+						dock_ram <= {ioctl_dout[0], dck_ram_s[7:1]};
+						dck_got  <= 1;
+					end
 					dck_hc <= 0;
 					if(m) begin
 						dck_hdr   <= 0;
-						dck_img   <= m;
 						dck_chunk <= dck_first(m);
 						dck_off   <= 0;
 					end
