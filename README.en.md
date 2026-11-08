@@ -67,6 +67,20 @@ chunks that have one. The core uses the DOCK bank, the cartridge one; EXROM and 
 The cartridge RAM chunks can be written; RAM chunks without contents in the file are not cleared. A `.bin` (just the
 image) does not say which chunks it goes in: use the `.dck`.
 
+### 48K games as cartridges
+
+`tools/snap2dck.py` makes a cartridge from a 48K snapshot (`.z80` or `.sna`) and a Spectrum ROM (the 48K one or the
+TC2048 one), like the TMX Spectrum Emulator:
+
+    python3 tools/snap2dck.py GAME.z80 48.rom
+
+The cartridge has the ROM in chunks 0-1 and the game's 48K in chunks 2-7: 64K, the whole DOCK. It is an LROS: the 2068
+ROM starts a loader placed in the free area of the Spectrum ROM, which copies the game into RAM, leaves the Spectrum ROM
+at 0000-3FFF, restores the registers and jumps to the game. The game sees a 48K Spectrum: ROM calls, the font and the
+interrupt at 0038h go to the Spectrum ROM. It is not for 128K games, nor for games that write port FF (on the 2068 it
+changes the screen mode and the memory map) or read it expecting the floating bus. The cartridge holds the ROM: keep it
+to yourself.
+
 ## esxDOS
 
 ### Making the VHD

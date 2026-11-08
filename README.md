@@ -67,6 +67,19 @@ blocos que as têm. O core usa o banco DOCK, o dos cartuchos; os bancos EXROM e 
 blocos de RAM do cartucho escrevem-se; os de RAM sem conteúdo no ficheiro não são limpos. Um `.bin` (só a imagem) não
 diz em que blocos vai: usa-se o `.dck`.
 
+### Jogos de 48K num cartucho
+
+O `tools/snap2dck.py` faz um cartucho a partir de um snapshot de 48K (`.z80` ou `.sna`) e de uma ROM do Spectrum (a
+do 48K ou a do TC2048), como o Spectrum Emulator da TMX:
+
+    python3 tools/snap2dck.py JOGO.z80 48.rom
+
+O cartucho leva a ROM nos blocos 0-1 e os 48K do jogo nos blocos 2-7: 64K, o DOCK todo. É um LROS: a ROM do 2068
+arranca um carregador posto na zona livre da ROM do Spectrum, que copia o jogo para a RAM, deixa a ROM do Spectrum em
+0000-3FFF, repõe os registos e salta para o jogo. O jogo vê um Spectrum de 48K: as chamadas à ROM, a fonte e a
+interrupção em 0038h vão à ROM do Spectrum. Não servem os jogos de 128K, nem os que escrevem na porta FF (no 2068 muda
+o modo do ecrã e a memória) ou a lêem à espera do bus flutuante. O cartucho leva a ROM: é para uso próprio.
+
 ## esxDOS
 
 ### Fazer a VHD
