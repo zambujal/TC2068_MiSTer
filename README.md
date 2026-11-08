@@ -182,7 +182,7 @@ se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. 
 contam como escrita).
 
 Só se nota em programas que testam o Z80. Para comparar as duas versões, o [`tools/z80test/`](tools/z80test) tem o
-z80test 1.2a de Patrik Rak (Raxoft): o z80ccf testa os flags depois de um CCF a seguir a cada instrução. Este T80
+z80test 1.2a de Patrik Rak (Raxoft), também numa versão que corre com a ROM do 2068 (`tools/z80test/tc2068/`): o z80ccf testa os flags depois de um CCF a seguir a cada instrução. Este T80
 passa o z80full e o z80ccf noutro core.
 
 ## Compilar

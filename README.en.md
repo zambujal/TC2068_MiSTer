@@ -183,7 +183,7 @@ only checked whether the flags *changed*; T80Q checks whether they were *written
 EX AF and SET/RES do not count as a write).
 
 It only shows in programs that test the Z80. To compare the two versions, [`tools/z80test/`](tools/z80test) has
-Patrik Rak's (Raxoft) z80test 1.2a: z80ccf tests the flags after a CCF following each instruction. This T80 passes
+Patrik Rak's (Raxoft) z80test 1.2a, also in a version that runs with the 2068 ROM (`tools/z80test/tc2068/`): z80ccf tests the flags after a CCF following each instruction. This T80 passes
 z80full and z80ccf in another core.
 
 ## Building
