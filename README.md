@@ -15,7 +15,8 @@ Estado: em teste (Novembro de 2026); experimentado num MiSTer (DE10-Nano com SDR
 A **ROM do TC2068 vem dentro do core** (porquê, em baixo). Para o TC2068 arrancar basta o `.rbf`:
 
 - `TC2068_AAAAMMDD.rbf` (o mais recente de [`releases/`](releases)) → pasta `_Computer/` do cartão do MiSTer. A data
-  no nome é a que o menu mostra.
+  no nome é a que o menu mostra. Ou o `TC2068_T80Q_AAAAMMDD.rbf`, o mesmo com o Z80 corrigido (em baixo, "O Z80");
+  podem estar os dois, e usam a mesma pasta `games/TC2068/`.
 
 O resto é opcional e vai na pasta `games/TC2068/`:
 
@@ -167,6 +168,20 @@ O esxDOS no TC2068 só foi feito e visto com a ROM que vem no core.
 
 A pasta [`releases/`](releases) só tem o core. Para o F12 → Savestate Disk, o core oficial tem um `savestates.sav` na
 [pasta releases dele](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
+
+## O Z80 (T80)
+
+Em `releases/` há duas versões do core, iguais em tudo o resto:
+
+- `TC2068_AAAAMMDD.rbf`: o T80 do core oficial;
+- `TC2068_T80Q_AAAAMMDD.rbf`: o T80 com o registo Q do Z80 da Zilog.
+
+Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F) dependem da instrução anterior. Num
+Z80 da Zilog, se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. O T80 do core oficial só via
+se os flags *mudavam* de valor; o da versão T80Q vê se foram *escritos*, mesmo com o mesmo valor (o POP AF, o EX AF
+e o SET/RES não contam como escrita). Por exemplo, `XOR A : CP 28h : CP 28h : SCF` dá F = 81h num Z80 e dava A9h.
+Só se nota em programas que testam o Z80, como o z80ccf do [z80test](https://github.com/raxoft/z80test) (Raxoft);
+este T80 passa o z80full e o z80ccf noutro core.
 
 ## Compilar
 

@@ -84,6 +84,7 @@ use work.T80_Pack.all;
 
 entity T80 is
 	generic(
+		R800_MULU : boolean := false;  -- (2026-10-23) o multiplicador do R800: sem ele (o Kairos nao o usa) sai do caminho critico
 		Mode   : integer := 0;  -- 0 => Z80, 1 => Fast Z80, 2 => 8080, 3 => GB
 		IOWait : integer := 0;  -- 0 => Single cycle I/O, 1 => Std I/O cycle
 		Flag_C : integer := 0;
@@ -193,7 +194,7 @@ architecture rtl of T80 is
 	-- Q register for Zilog SCF/CCF undocumented flag behavior
 	-- Captures F[5,3] (YF,XF) after flag-modifying instructions
 	signal Q_reg                : std_logic_vector(7 downto 0);
-	signal F_last               : std_logic_vector(7 downto 0);
+	signal F_esc                : std_logic := '0';      -- (2026-10-23) a instrucao escreveu os flags
 
 	-- ALU signals
 	signal BusB                 : std_logic_vector(7 downto 0);
@@ -396,6 +397,9 @@ begin
 		variable ioq : std_logic_vector(8 downto 0);
 		variable temp_c : unsigned(8 downto 0);
 		variable temp_h : unsigned(4 downto 0);
+		variable fw : std_logic;                 -- (2026-10-23) a instrucao escreveu os flags neste ciclo
+		variable Q_ula : std_logic;              -- os flags da ALU da instrucao anterior escritos agora
+		variable inicio : boolean;               -- 1.o ciclo de uma instrucao (M1, T1)
 	begin
 		if RESET_n = '0' then
 			PC <= (others => '0');  -- Program Counter
@@ -433,7 +437,6 @@ begin
 			XY_Ind <= '0';
 			I_RXDD <= '0';
 			Q_reg <= (others => '0');
-			F_last <= (others => '1');
 
 		elsif rising_edge(CLK_n) then
 
@@ -450,6 +453,8 @@ begin
 				IStatus <= DIR(209 downto 208);
 
 			elsif ClkEn = '1' then
+				fw := '0'; Q_ula := '0';
+				inicio := MCycle = "001" and TState = 1;
 				ALU_Op_r <= "0000";
 				Save_ALU_r <= '0';
 				Read_To_Reg_r <= "00000";
@@ -459,19 +464,19 @@ begin
 				if LDHLSP = '1' and MCycle = "011" and TState = 1 then
 					temp_c := unsigned('0'&SP(7 downto 0))+unsigned('0'&Save_Mux);
 					temp_h := unsigned('0'&SP(3 downto 0))+unsigned('0'&Save_Mux(3 downto 0));
-					F(Flag_Z) <= '0';
-					F(Flag_N) <= '0';
-					F(Flag_H) <= temp_h(4);
-					F(Flag_C) <= temp_c(8);
+					F(Flag_Z) <= '0'; fw := '1';
+					F(Flag_N) <= '0'; fw := '1';
+					F(Flag_H) <= temp_h(4); fw := '1';
+					F(Flag_C) <= temp_c(8); fw := '1';
 				end if;
 
 				if ADDSPdd = '1' and TState = 1 then
 					temp_c := unsigned('0'&SP(7 downto 0))+unsigned('0'&Save_Mux);
 					temp_h := unsigned('0'&SP(3 downto 0))+unsigned('0'&Save_Mux(3 downto 0));
-					F(Flag_Z) <= '0';
-					F(Flag_N) <= '0';
-					F(Flag_H) <= temp_h(4);
-					F(Flag_C) <= temp_c(8);
+					F(Flag_Z) <= '0'; fw := '1';
+					F(Flag_N) <= '0'; fw := '1';
+					F(Flag_H) <= temp_h(4); fw := '1';
+					F(Flag_C) <= temp_c(8); fw := '1';
 				end if;
 
 				if Mode = 3 then
@@ -648,49 +653,49 @@ begin
 							if I_CPL = '1' then
 								-- CPL
 								ACC <= not ACC;
-								F(Flag_H) <= '1';
-								F(Flag_N) <= '1';
+								F(Flag_H) <= '1'; fw := '1';
+								F(Flag_N) <= '1'; fw := '1';
 							end if;
 							if I_CCF = '1' then
 								-- CCF
-								F(Flag_C) <= not F(Flag_C);
-								F(Flag_H) <= '0';
-								F(Flag_N) <= '0';
+								F(Flag_C) <= not F(Flag_C); fw := '1';
+								F(Flag_H) <= '0'; fw := '1';
+								F(Flag_N) <= '0'; fw := '1';
 							end if;
 							if I_SCF = '1' then
 								-- SCF
-								F(Flag_C) <= '1';
-								F(Flag_H) <= '0';
-								F(Flag_N) <= '0';
+								F(Flag_C) <= '1'; fw := '1';
+								F(Flag_H) <= '0'; fw := '1';
+								F(Flag_N) <= '0'; fw := '1';
 							end if;
 						else
 							if I_CPL = '1' then
 								-- CPL
 								ACC <= not ACC;
-								F(Flag_Y) <= not ACC(5);
-								F(Flag_H) <= '1';
-								F(Flag_X) <= not ACC(3);
-								F(Flag_N) <= '1';
+								F(Flag_Y) <= not ACC(5); fw := '1';
+								F(Flag_H) <= '1'; fw := '1';
+								F(Flag_X) <= not ACC(3); fw := '1';
+								F(Flag_N) <= '1'; fw := '1';
 							end if;
 							if I_CCF = '1' then
 								-- CCF: Zilog Z80 behavior
 								-- Undocumented YF/XF: (A | (F & ~Q)) & 0x28
-								F(Flag_C) <= not F(Flag_C);
-								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
-								F(Flag_H) <= F(Flag_C);
-								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
-								F(Flag_N) <= '0';
+								F(Flag_C) <= not F(Flag_C); fw := '1';
+								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y)); fw := '1';
+								F(Flag_H) <= F(Flag_C); fw := '1';
+								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X)); fw := '1';
+								F(Flag_N) <= '0'; fw := '1';
 								Q_reg(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
 								Q_reg(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 							end if;
 							if I_SCF = '1' then
 								-- SCF: Zilog Z80 behavior
 								-- Undocumented YF/XF: (A | (F & ~Q)) & 0x28
-								F(Flag_C) <= '1';
-								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
-								F(Flag_H) <= '0';
-								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
-								F(Flag_N) <= '0';
+								F(Flag_C) <= '1'; fw := '1';
+								F(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y)); fw := '1';
+								F(Flag_H) <= '0'; fw := '1';
+								F(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X)); fw := '1';
+								F(Flag_N) <= '0'; fw := '1';
 								Q_reg(Flag_Y) <= ACC(5) or (F(Flag_Y) and not Q_reg(Flag_Y));
 								Q_reg(Flag_X) <= ACC(3) or (F(Flag_X) and not Q_reg(Flag_X));
 							end if;
@@ -705,11 +710,11 @@ begin
 						else
 							ioq := ('0' & DI_Reg) + ('0' & std_logic_vector(ID16(7 downto 0)));
 						end if;
-						F(Flag_N) <= DI_Reg(7);
-						F(Flag_C) <= ioq(8);
-						F(Flag_H) <= ioq(8);
+						F(Flag_N) <= DI_Reg(7); fw := '1';
+						F(Flag_C) <= ioq(8); fw := '1';
+						F(Flag_H) <= ioq(8); fw := '1';
 						ioq := (ioq and "000000111") xor ('0'&BusA);
-						F(Flag_P) <= not (ioq(0) xor ioq(1) xor ioq(2) xor ioq(3) xor ioq(4) xor ioq(5) xor ioq(6) xor ioq(7));
+						F(Flag_P) <= not (ioq(0) xor ioq(1) xor ioq(2) xor ioq(3) xor ioq(4) xor ioq(5) xor ioq(6) xor ioq(7)); fw := '1';
 						last_B <= BusA;
 					end if;
 
@@ -727,23 +732,23 @@ begin
 							pc_tmp := PC - 2;
  							PC <= pc_tmp;
 							WZ <= std_logic_vector(PC)-"1";
-							F(Flag_X) <= pc_tmp(11);
-							F(Flag_Y) <= pc_tmp(13);
+							F(Flag_X) <= pc_tmp(11); fw := '1';
+							F(Flag_Y) <= pc_tmp(13); fw := '1';
 							if BTR_r2 = '1' then
 								-- INIR/INDR/OTIR/OTDR repeat: adjust HF and PF
 								-- balu = B-1 if CF&NF, B+1 if CF&!NF, else B
 								n := last_B;
 								if F(Flag_C) = '1' then
 									if F(Flag_N) = '1' then
-										F(Flag_H) <= not (last_B(0) or last_B(1) or last_B(2) or last_B(3));
+										F(Flag_H) <= not (last_B(0) or last_B(1) or last_B(2) or last_B(3)); fw := '1';
 										n := last_B - "1";
 									else
-										F(Flag_H) <= last_B(0) and last_B(1) and last_B(2) and last_B(3);
+										F(Flag_H) <= last_B(0) and last_B(1) and last_B(2) and last_B(3); fw := '1';
 										n := last_B + "1";
 									end if;
 								end if;
 								-- PF: XOR with parity of (balu & 7)
-								F(Flag_P) <= F(Flag_P) xor (n(0) xor n(1) xor n(2));
+								F(Flag_P) <= F(Flag_P) xor (n(0) xor n(1) xor n(2)); fw := '1';
 							end if;
 						end if;
 						if RstP = '1' then
@@ -802,36 +807,36 @@ begin
 						case Special_LD(1 downto 0) is
 						when "00" =>
 							ACC <= I;
-							F(Flag_P) <= IntE_FF2;
-							F(Flag_S) <= I(7);
+							F(Flag_P) <= IntE_FF2; fw := '1';
+							F(Flag_S) <= I(7); fw := '1';
 
 							if I = x"00" then
-								F(Flag_Z) <= '1';
+								F(Flag_Z) <= '1'; fw := '1';
 							else
-								F(Flag_Z) <= '0';
+								F(Flag_Z) <= '0'; fw := '1';
 							end if;
 
-							F(Flag_Y) <= I(5);
-							F(Flag_H) <= '0';
-							F(Flag_X) <= I(3);
-							F(Flag_N) <= '0';
+							F(Flag_Y) <= I(5); fw := '1';
+							F(Flag_H) <= '0'; fw := '1';
+							F(Flag_X) <= I(3); fw := '1';
+							F(Flag_N) <= '0'; fw := '1';
 
 
 						when "01" =>
 							ACC <= std_logic_vector(R);
-							F(Flag_P) <= IntE_FF2;
-							F(Flag_S) <= R(7);
+							F(Flag_P) <= IntE_FF2; fw := '1';
+							F(Flag_S) <= R(7); fw := '1';
 
 							if R = x"00" then
-								F(Flag_Z) <= '1';
+								F(Flag_Z) <= '1'; fw := '1';
 							else
-								F(Flag_Z) <= '0';
+								F(Flag_Z) <= '0'; fw := '1';
 							end if;
 
-							F(Flag_Y) <= R(5);
-							F(Flag_H) <= '0';
-							F(Flag_X) <= R(3);
-							F(Flag_N) <= '0';
+							F(Flag_Y) <= R(5); fw := '1';
+							F(Flag_H) <= '0'; fw := '1';
+							F(Flag_X) <= R(3); fw := '1';
+							F(Flag_N) <= '0'; fw := '1';
 
 						when "10" =>
 							I <= ACC;
@@ -855,18 +860,21 @@ begin
 							F(Flag_C) <= F_Out(0);
 						end if;
 					end if;
+					if ALU_Op_r(3 downto 1) /= "101" then          -- (2026-10-24) SET/RES reescrevem F igual: no Z80 nao contam
+						if inicio then Q_ula := '1'; else fw := '1'; end if;   -- (2026-10-23) de quem e' esta escrita dos flags
+					end if;
 				end if;
 				if T_Res = '1' and I_INRC = '1' then
-					F(Flag_H) <= '0';
-					F(Flag_N) <= '0';
-					F(Flag_X) <= DI_Reg(3);
-					F(Flag_Y) <= DI_Reg(5);
+					F(Flag_H) <= '0'; fw := '1';
+					F(Flag_N) <= '0'; fw := '1';
+					F(Flag_X) <= DI_Reg(3); fw := '1';
+					F(Flag_Y) <= DI_Reg(5); fw := '1';
 					if DI_Reg(7 downto 0) = "00000000" then
-						F(Flag_Z) <= '1';
+						F(Flag_Z) <= '1'; fw := '1';
 					else
-						F(Flag_Z) <= '0';
+						F(Flag_Z) <= '0'; fw := '1';
 					end if;
-					F(Flag_S) <= DI_Reg(7);
+					F(Flag_S) <= DI_Reg(7); fw := '1';
 					F(Flag_P) <= not (DI_Reg(0) xor DI_Reg(1) xor DI_Reg(2) xor DI_Reg(3) xor
 						DI_Reg(4) xor DI_Reg(5) xor DI_Reg(6) xor DI_Reg(7));
 				end if;
@@ -897,18 +905,18 @@ begin
 				end if;
 
 				if TState = 1 and I_BT = '1' then
-					F(Flag_X) <= ALU_Q(3);
-					F(Flag_Y) <= ALU_Q(1);
-					F(Flag_H) <= '0';
-					F(Flag_N) <= '0';
+					F(Flag_X) <= ALU_Q(3); fw := '1';
+					F(Flag_Y) <= ALU_Q(1); fw := '1';
+					F(Flag_H) <= '0'; fw := '1';
+					F(Flag_N) <= '0'; fw := '1';
 				end if;
 				if TState = 1 and I_BC = '1' then
 					n := ALU_Q - ("0000000" & F_Out(Flag_H));
-					F(Flag_X) <= n(3);
-					F(Flag_Y) <= n(1);
+					F(Flag_X) <= n(3); fw := '1';
+					F(Flag_Y) <= n(1); fw := '1';
 				end if;
 				if I_BC = '1' or I_BT = '1' then
-					F(Flag_P) <= IncDecZ;
+					F(Flag_P) <= IncDecZ; fw := '1';
 				end if;
 
 				if (TState = 1 and Save_ALU_r = '0' and Auto_Wait_t1 = '0') or
@@ -924,8 +932,8 @@ begin
 						SP(15 downto 8) <= unsigned(Save_Mux);
 					when "11011" =>
 						if Mode = 3 then
-							F(7 downto 4) <= Save_Mux(7 downto 4);
-							F(3 downto 0) <= "0000"; -- bit 3 to 0 always return 0
+							F(7 downto 4) <= Save_Mux(7 downto 4); fw := '1';
+							F(3 downto 0) <= "0000"; -- bit 3 to 0 always return 0 fw := '1';
 						else
 							F <= Save_Mux;
 						end if;
@@ -936,21 +944,26 @@ begin
 					end if;
 				end if;
 
-				-- Q register update for Zilog SCF/CCF behavior
-				-- At end of instruction: if flags changed, Q = F & 0x28
-				-- If flags didn't change and not SCF/CCF, Q = 0
-				-- SCF/CCF update Q internally, so skip them here
-				if T_Res = '1' and Mode /= 3 then
-					if I_SCF = '0' and I_CCF = '0' then
-						if F /= F_last then
+				-- (2026-10-23) registo Q (Zilog): no 1.o ciclo de cada instrucao, Q = F se a anterior escreveu os
+				-- flags (mesmo com o mesmo valor; o POP AF e o EX AF nao contam), senao 0. As da ALU escrevem-nos
+				-- nesse mesmo 1.o ciclo da seguinte: entao Q = o que a ALU escreve. Um prefixo DD/FD e' uma
+				-- instrucao que nao os escreve (Q = 0 antes do SCF/CCF).
+				if Mode /= 3 then
+					if inicio then
+						if Q_ula = '1' then
+							Q_reg(Flag_Y) <= F_Out(Flag_Y);
+							Q_reg(Flag_X) <= F_Out(Flag_X);
+						elsif F_esc = '1' then
 							Q_reg(Flag_Y) <= F(Flag_Y);
 							Q_reg(Flag_X) <= F(Flag_X);
 						else
 							Q_reg(Flag_Y) <= '0';
 							Q_reg(Flag_X) <= '0';
 						end if;
+						F_esc <= fw;
+					else
+						F_esc <= F_esc or fw;
 					end if;
-					F_last <= F;
 				end if;
 			end if;
 		end if;
@@ -1047,7 +1060,7 @@ begin
 				(TState = 3 and MCycle = "001" and IncDec_16(2) = '1')) and IncDec_16(1 downto 0) = "10" else
 			-- EX HL,DL
 			Alternate & "10" when ExchangeDH = '1' and TState = 3 else
-			Alternate & "01" when (ExchangeDH = '1' or I_MULU = '1') and TState = 4 else
+			Alternate & "01" when (ExchangeDH = '1' or (R800_MULU and I_MULU = '1')) and TState = 4 else
 			-- EX (SP),HL (HL(IX,IY) <= WZ)
 			Alternate & "10" when ExchangeWH = '1' and XY_State = "00" and TState = 4 else
 			XY_State(1) & "11" when ExchangeWH = '1' and TState = 4 else
@@ -1081,7 +1094,7 @@ begin
 			end case;
 		end if;
 
-		if I_MULU = '1' and (T_Res = '1' or TState = 4) then    -- TState = 4 DE write
+		if R800_MULU and I_MULU = '1' and (T_Res = '1' or TState = 4) then    -- TState = 4 DE write
 			RegWEH <= '1';
 			RegWEL <= '1';
 		end if;
@@ -1114,7 +1127,7 @@ begin
 		RegDIH <= Save_Mux;
 		RegDIL <= Save_Mux;
 
-		if I_MULU = '1' then
+		if R800_MULU and I_MULU = '1' then
 			if T_Res = '1' then
 				RegDIH <= MULU_Prod32(31 downto 24);
 				RegDIL <= MULU_Prod32(23 downto 16);
