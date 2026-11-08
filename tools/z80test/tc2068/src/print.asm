@@ -4,7 +4,10 @@
 ;
 ; This source code is released under the MIT license, see included license.txt.
 ;
-; Changed in 2026 for the TS2068/TC2068: printinit finds CHAN-OPEN in either ROM (see below).
+; Changed in 2026 for the TS2068/TC2068: printinit finds CHAN-OPEN in either ROM (see below), and
+; printchr sets IM 1 before EI: the last test (IM N) leaves the Z80 in IM 0, where an interrupt runs
+; the byte on the bus instead of RST 38h. That byte is FFh (= RST 38h) on a real Spectrum or Timex, not
+; always on an FPGA core; BASIC runs in IM 1.
 
 
 ; CHAN-OPEN is at 0x1601 in the 48K ROM (and in the TC2048 one), at 0x1230 in the TS2068/TC2068 ROM
@@ -76,6 +79,7 @@ printchr:   push    iy
             push    de
             push    bc
             exx
+            im      1           ; the IM N test leaves IM 0 (TC2068 change, see the top)
             ei
             ; out     (0xff),a
             rst     0x10
