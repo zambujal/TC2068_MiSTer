@@ -178,7 +178,7 @@ for the Quartus version: there are 17 and 25 (the same as 17). Compared with the
 `rtl/turbosound.sv`, `rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and
 `rtl/tc2068.mif`, `tools/rom2mif.py` and `tools/faz_vhd.py` are added.
 
-With Quartus Lite 25.1 timing is met (November 2026: +0.5 ns setup slack on the 112 MHz clock). For that, also for
+With Quartus Lite 25.1 timing is met (November 2026: +0.7 ns setup slack on the 112 MHz clock). For that, also for
 the other machines: the copy of banks 5 and 7 for the video (the VRAM) is written a clock later, through a register;
 and `ZX-Spectrum.sdc` gives two clocks to the paths that start at what only changes with an OUT (the TC2068 ports #F4
 and #FF, the DivMMC #E3) and at the Z80 refresh signal on the way to the SDRAM.
