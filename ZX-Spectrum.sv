@@ -540,7 +540,7 @@ reg   [7:0] dock_ram = 0;                   // of those, the RAM ones (writable)
 reg  [15:0] dck_dest = 0;                   // chunk and offset of the byte being written
 reg         dck_wr   = 0;                   // and whether it goes to the DOCK
 reg   [4:0] dck_rst  = 0;
-wire        dck_reset = |dck_rst;
+wire        dck_reset = |dck_rst | dl_dck;  // held in reset while the .dck loads: the loader owns the SDRAM from its first byte
 
 function [2:0] dck_first(input [7:0] m);    // lowest chunk with an image
 	casex(m)
