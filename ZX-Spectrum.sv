@@ -52,9 +52,10 @@ localparam ARCH_TC2068= 5'b110_00; // Timex TC2068
 // Timex TC2068 (memory code 6, the first entry of the Memory menu and the default):
 //   The 2068 ROM (HOME 16K + EXROM 8K, the TS2068 one) is inside the core (rtl/tc2068.mif, BRAM).
 //   A boot2.rom replaces it: loaded at 0x140000, HOME at ROM page 0, EXROM at 0x144000 (24 KB),
-//   optionally followed by an esxDOS firmware for the 2068 (ESX2068, 8 KB at 0x146000; 32 KB).
+//   optionally followed by an esxDOS firmware for the 2068 (ESX2068, 8 KB, loaded at 0x14C000; 32 KB).
 //   #F4 (HSR): a bit set puts that 8K chunk in the EXROM (#FF bit 7 = 1) or the DOCK
-//   (#FF bit 7 = 0, empty: reads #FF); no RAM writes there. #FF bit 6 = 1 stops the frame
+//   (#FF bit 7 = 0): the cartridge loaded from the OSD (.dck, at 0x1C0000; its RAM chunks can be
+//   written), or #FF where it has no chunk; no RAM writes there. #FF bit 6 = 1 stops the frame
 //   interrupt. #F4 and #FF read back. #FE answers only at #FE. AY at #F5 (register) / #F6
 //   (data), the second Turbosound chip; #FFFD/#BFFD (full low byte #FD in this mode) keep the
 //   Turbosound one. Joysticks on AY register 14: A8 = joystick 1, A9 = joystick 2, active
@@ -85,6 +86,7 @@ localparam CONF_STR = {
 	"S0,TRDIMGDSKMGT,Load Disk;",
 	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
+	"H6F3,DCK,Load 2068 Cartridge;",
 	"S1,VHD,Load DivMMC;",
 	"F6,ROMMLD,Load Dandanator;",
 	"SC2,SAV,Savestate Disk;",
@@ -342,7 +344,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.forced_scandoubler(forced_scandoubler),
 	.new_vmode(new_vmode),
 	.status(status),
-	.status_menumask({status[55],status[9:8] != 2,|status[9:8],en1080p,|vcrop,~need_apply}),
+	.status_menumask({~tmx_sel,status[55],status[9:8] != 2,|status[9:8],en1080p,|vcrop,~need_apply}),
 	.status_set(speed_set|arch_set|snap_hwset|opt_dan),
 	.status_in({status[63], status[62] | opt_dan, status[61:25],
 	             speed_set ? speed_req : (arch_set | snap_hwset) ? 3'b000 : status[24:22], status[21:13],
@@ -404,7 +406,7 @@ wire        nBUSACK;
 wire        nINT;
 wire        nBUSRQ = ~ioctl_download;
 wire        dan_reset, dan_nmi_n;
-wire        reset_core = buttons[1] | status[0] | status[63] | cold_reset | warm_reset | shdw_reset | Fn[10] | mmc_reset;
+wire        reset_core = buttons[1] | status[0] | status[63] | cold_reset | warm_reset | shdw_reset | Fn[10] | mmc_reset | dck_reset;
 wire        reset  = reset_core | dan_reset;
 
 wire        cold_reset =((mod[2:1] == 1) & Fn[11]) | init_reset | arch_reset | snap_reset | mmc_reset;
@@ -521,9 +523,97 @@ wire        ram_ready;
 // boot.rom -> 0x150000, boot1.rom (ESXMMC) -> 0x14C000, boot2.rom (TC2068) -> 0x140000; the ESX2068 of a 32K boot2.rom
 // (its last 8K) goes over boot1.rom at 0x14C000, so the DivMMC ROM is page 3 in every machine
 reg [24:0] load_addr;
-always @(posedge clk_sys) load_addr <= ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 :
+always @(posedge clk_sys) load_addr <= dl_dck ? { 9'h01C, dck_dest } :                     // TC2068 cartridge: see below
+                                       ioctl_addr + ((ioctl_index[4:0] == 6) ? 25'h1000000 : ioctl_index[4:0] ? 25'h400000 :
                                                      (ioctl_index[7:6] == 2) ? ((ioctl_addr[14:13] == 2'b11) ? 25'h146000 : 25'h140000) :
                                                      ioctl_index[7:6] ? 25'h14C000 : 25'h150000);
+
+// TC2068 DOCK cartridge (.dck, F12 -> Load 2068 Cartridge). Each bank in the file: 9 header bytes (the bank number, then
+// one byte per 8K chunk: 0 none, 1 RAM, 2 ROM, 3 RAM with contents), then the 8K images of the chunks that have one (bit 1),
+// in order. Bank 0 (the DOCK) goes to the SDRAM at 0x1C0000 (64K); the other banks (EXROM 254, HOME 255) are skipped.
+// A reset follows, so that the 2068 ROM finds the cartridge (LROS at DOCK 0000h, AROS at 8000h), as when one is plugged in.
+// The destination is taken when hps_io gives the byte's address (a clock before ioctl_wr) and holds until the next byte,
+// like load_addr for the other files: the SDRAM takes the address some clocks after the write request.
+wire        dl_dck   = ioctl_download && (ioctl_index[4:0] == 3);
+reg   [7:0] dock_on  = 0;                   // chunks the cartridge has
+reg   [7:0] dock_ram = 0;                   // of those, the RAM ones (writable)
+reg  [15:0] dck_dest = 0;                   // chunk and offset of the byte being written
+reg         dck_wr   = 0;                   // and whether it goes to the DOCK
+reg   [4:0] dck_rst  = 0;
+wire        dck_reset = |dck_rst;
+
+function [2:0] dck_first(input [7:0] m);    // lowest chunk with an image
+	casex(m)
+		8'bXXXXXXX1: dck_first = 3'd0;
+		8'bXXXXXX10: dck_first = 3'd1;
+		8'bXXXXX100: dck_first = 3'd2;
+		8'bXXXX1000: dck_first = 3'd3;
+		8'bXXX10000: dck_first = 3'd4;
+		8'bXX100000: dck_first = 3'd5;
+		8'bX1000000: dck_first = 3'd6;
+		default:     dck_first = 3'd7;
+	endcase
+endfunction
+
+reg         dck_old_dl = 0, dck_hdr = 1, dck_bank0 = 0, dck_got = 0;
+reg   [3:0] dck_hc = 0;
+reg   [7:0] dck_img = 0;
+reg   [2:0] dck_chunk = 0;
+reg  [12:0] dck_off = 0;
+reg  [24:0] dck_old_a = 0;
+always @(posedge clk_sys) begin
+	reg [7:0] m;
+
+	dck_old_dl <= dl_dck;
+	dck_old_a  <= ioctl_addr;
+	if(dck_rst) dck_rst <= dck_rst + 1'd1;
+	if(dck_old_dl & ~dl_dck & dck_got) dck_rst <= 1;   // the file is in: reset
+	if(status[63]) {dock_on, dock_ram} <= 0;           // Reset & Detach Cartridge
+
+	if(dl_dck & ~dck_old_dl) begin
+		{dock_on, dock_ram} <= 0;
+		{dck_hdr, dck_hc, dck_got, dck_wr} <= {1'b1, 4'd0, 1'b0, 1'b0};
+	end
+	else if(dl_dck) begin
+		if(ioctl_addr != dck_old_a) begin
+			dck_dest <= {dck_chunk, dck_off};
+			dck_wr   <= ~dck_hdr & dck_bank0;
+		end
+		if(ioctl_wr) begin
+			if(dck_hdr) begin
+				if(!dck_hc) dck_bank0 <= !ioctl_dout;
+				else begin
+					dck_img[dck_hc - 1'd1] <= ioctl_dout[1];
+					if(dck_bank0) begin
+						dock_on[dck_hc - 1'd1]  <= |ioctl_dout[1:0];
+						dock_ram[dck_hc - 1'd1] <= ioctl_dout[0];
+					end
+				end
+				dck_hc <= dck_hc + 1'd1;
+				if(dck_hc == 8) begin
+					m = {ioctl_dout[1], dck_img[6:0]};
+					if(dck_bank0) dck_got <= 1;
+					dck_hc <= 0;
+					if(m) begin
+						dck_hdr   <= 0;
+						dck_img   <= m;
+						dck_chunk <= dck_first(m);
+						dck_off   <= 0;
+					end
+				end
+			end
+			else begin
+				dck_off <= dck_off + 1'd1;
+				if(&dck_off) begin
+					m = dck_img & ~(8'd1 << dck_chunk);
+					dck_img <= m;
+					if(m) dck_chunk <= dck_first(m);
+					else  dck_hdr   <= 1;          // next bank
+				end
+			end
+		end
+	end
+end
 
 // boot2.rom: the TC2068 ROM (24 KB), with ESX2068 when it has 32 KB; at most 32 KB is written
 wire dl_tmx      = ioctl_download && (ioctl_index == 8'h80);
@@ -551,7 +641,7 @@ always_comb begin
 		'b001X_X_XX: ram_addr = tape_addr;
 		'b0001_X_XX: ram_addr = { 4'b1000, mmc_ram_bank,                                     addr[12:0]};
 		'b0000_0_00: ram_addr = (dan_rom & ~tmx_mode) ? { 6'b100000, dan_page, a14 } : scorp ? (scorp_1ffd[0] ? { 1'b0, 4'd0, a14 } : { 3'b110, page_rom, a14 })
-		                              : { 3'b101, page_rom, a14 }; //ROM (scorp: RAM bank 0 / Scorpion ROM window; TC2068: see tmx_exr)
+		                              : tmx_dock_lo ? tmx_exrom : { 3'b101, page_rom, a14 }; //ROM (scorp: RAM bank 0 / Scorpion ROM window; TC2068: see tmx_exr)
 		'b0000_0_01: ram_addr = tmx_exr ? tmx_exrom : scorp ? { 1'b0, 4'd5, a14 } : { 4'b0000, 3'd5, a14 }; // #4000: bank 5 fixed (screen)
 		'b0000_0_10: ram_addr = tmx_exr ? tmx_exrom : scorp ? { 1'b0, 4'd2, a14 } : { 4'b0000, 3'd2, a14 }; // #8000: bank 2 fixed
 		'b0000_0_11: ram_addr = tmx_exr ? tmx_exrom : { 1'b0, (scorp ? {1'b0, scorp_page} : page_ram), a14};          // #C000: paged bank
@@ -576,9 +666,9 @@ always_comb begin
 
 	casex({snap_reset, load, tape_req})
 		'b1XX: ram_we = snap_wr;
-		'b01X: ram_we = ioctl_wr & ~dl_tmx_over;
+		'b01X: ram_we = ioctl_wr & ~dl_tmx_over & (~dl_dck | dck_wr);
 		'b001: ram_we = 0;
-		'b000: ram_we = (mmc_ram_en | page_special | ((addr[15] | addr[14]) & ~tmx_ext) | (~dan_rom & ~scorp & (plusd_mem | mf128_mem) & addr[13]) | (~dan_rom & scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
+		'b000: ram_we = (mmc_ram_en | page_special | ((addr[15] | addr[14]) & ~tmx_ext) | tmx_dock_we | (~dan_rom & ~scorp & (plusd_mem | mf128_mem) & addr[13]) | (~dan_rom & scorp & scorp_1ffd[0] & ~addr[14] & ~addr[15])) & ~nMREQ & ~nWR;
 	endcase
 
 	if(ss_active) begin
@@ -755,18 +845,22 @@ reg        tmx_mode = 0;                            // set at reset, like zx48
 reg  [7:0] tmx_hsr;                                 // #F4: chunks in EXROM/DOCK
 reg  [7:0] tmx_dec;                                 // #FF: the ULA keeps bits 5-0 for the video
 wire       tmx_ext     = tmx_mode & tmx_hsr[addr[15:13]] & ~ss_active;  // this chunk is EXROM/DOCK
-wire       tmx_dock_rd = tmx_ext & ~tmx_dec[7] & ~mmc_rom_en & ~mmc_ram_en;
-wire       tmx_exlo    = tmx_mode & tmx_hsr[0] & tmx_dec[7];            // EXROM at 0000-1FFF (DivMMC traps)
+wire       tmx_dock    = tmx_ext & ~tmx_dec[7] & ~mmc_rom_en & ~mmc_ram_en; // this chunk is the DOCK (#FF bit 7 = 0)
+wire       tmx_dock_rd = tmx_dock & ~dock_on[addr[15:13]];                 // with no cartridge chunk there: #FF
+wire       tmx_dock_we = tmx_dock & dock_ram[addr[15:13]];                 // a RAM chunk of the cartridge
+wire       tmx_exlo    = tmx_mode & tmx_hsr[0];                            // EXROM or DOCK at 0000-1FFF (DivMMC traps)
 
 // The memory map (ram_addr) of the TC2068 is in the core's own one, so that the DivMMC signals take no longer than in the other
 // machines: the DivMMC RAM comes first (mmc_ram_en); at 0000-3FFF page_rom gives the DivMMC ROM (page 3: boot1.rom, patched in
-// cpu_din, or the ESX2068 of a 32K boot2.rom), the EXROM at 0x144000 when the chunk has its #F4 bit set (or the empty DOCK:
-// cpu_din gives #FF), or the HOME ROM (page 0); above 3FFF a chunk with its #F4 bit set is the EXROM too. The EXROM is 8K,
-// so A13 is 0 in its chunks: a14 is addr[13:0] with that, in every case (in the other machines it is just addr[13:0]).
+// cpu_din, or the ESX2068 of a 32K boot2.rom), the EXROM at 0x144000 when the chunk has its #F4 bit set, or the HOME ROM
+// (page 0); above 3FFF a chunk with its #F4 bit set is the EXROM too. The EXROM is 8K, so A13 is 0 in its chunks: a14 is
+// addr[13:0] with that, in every case (in the other machines it is just addr[13:0]). With #FF bit 7 = 0 those chunks are the
+// DOCK instead: the cartridge at 0x1C0000 + addr (64K; cpu_din gives #FF where the cartridge has no chunk).
 // (No ss_active here: the savestate ram_addr comes after it, and savestates only run with #F4 at 0.)
-wire        tmx_exr   = tmx_mode & tmx_hsr[addr[15:13]];
-wire [13:0] a14       = { addr[13] & ~tmx_exr, addr[12:0] };
-wire [24:0] tmx_exrom = { 3'b101, 4'd1, a14 };
+wire        tmx_exr     = tmx_mode & tmx_hsr[addr[15:13]];
+wire [13:0] a14         = { addr[13] & ~tmx_exr, addr[12:0] };
+wire [24:0] tmx_exrom   = tmx_dec[7] ? { 3'b101, 4'd1, a14 } : { 9'h01C, addr[15:0] };
+wire        tmx_dock_lo = tmx_exr & ~tmx_dec[7] & ~mmc_rom_en;           // the DOCK at 0000-3FFF (the DivMMC ROM comes first)
 
 always @(posedge clk_sys) begin
 	reg old_wr;

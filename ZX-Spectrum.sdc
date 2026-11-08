@@ -87,6 +87,9 @@ set_false_path -from {emu|hps_io|status[*]}
 set_false_path -from {emu|tmx_mode}
 set_false_path -from {emu|tmx_rom_ok emu|tmx_esx_ok emu|esx089}
 
+# TC2068 cartridge: which chunks it has only change while the .dck loads (the CPU waits on BUSRQ) or at Detach (reset)
+set_false_path -from {emu|dock_on[*] emu|dock_ram[*]}
+
 # TC2068 #F4/#FF: they only change with an OUT, and the next memory access comes several clocks later
 set_multicycle_path -from {emu|tmx_hsr* emu|tmx_dec*} -setup 2
 set_multicycle_path -from {emu|tmx_hsr* emu|tmx_dec*} -hold 1

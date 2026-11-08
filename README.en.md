@@ -3,45 +3,73 @@
 *Em português: [README.md](README.md)*
 
 The official MiSTer **ZX-Spectrum** core ([MiSTer-devel](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer), by
-Sorgelig and others) with the **Timex Computer TC2068** as its main machine. The other machines (Spectrum 48K, 128K,
-+2A/+3, Pentagon, Profi, Scorpion) are still in the code, but the official core is the one to use for them: this
-repository does not carry their ROMs. What the official core does is in [README_ZX-Spectrum.md](README_ZX-Spectrum.md).
+Sorgelig and others) with the **Timex Computer TC2068** as its main machine: HOME ROM and EXROM, DOCK cartridges, AY,
+joysticks, Timex video modes and DivMMC with esxDOS. It is only for the TC2068: for the other machines (Spectrum 48K,
+128K, +2A/+3, Pentagon…) use the official core. What the official core does is in
+[README_ZX-Spectrum.md](README_ZX-Spectrum.md).
 
 Status: testing (November 2026); tried on a MiSTer (DE10-Nano with SDRAM).
 
-## What goes on the MiSTer SD card
+## Installing
 
 The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068 needs to boot:
 
-- `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → folder `_Computer/`. The date in the name is the one
-  the menu shows.
+- `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → folder `_Computer/` on the MiSTer SD card. The date
+  in the name is the one the menu shows.
 
 Everything else is optional and goes in the folder `games/TC2068/`:
 
 | File | What for | Where to get it |
 |---|---|---|
-| `boot1.rom` | esxDOS: it is the DivMMC ROM | `ESXMMC.BIN` from the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org), renamed to `boot1.rom`; `tools/faz_vhd.py` does that (below, "Making the esxDOS VHD") |
-| a VHD (`.vhd`) | the DivMMC card, with the `BIN`, `SYS` and `TMP` folders of the same esxDOS package | made with `tools/faz_vhd.py`; the secondary SD card of the I/O board can be used instead |
-| `boot2.rom` | another TC2068 ROM, instead of the one in the core; normally not needed | below |
+| `boot1.rom` | esxDOS: it is the DivMMC ROM | `ESXMMC.BIN` from the esxDOS 0.8.9 package at [esxdos.org](https://www.esxdos.org), renamed to `boot1.rom`; `tools/faz_vhd.py` does that (below, "esxDOS") |
+| a VHD (`.vhd`) | the DivMMC card, with the `BIN`, `SYS` and `TMP` folders of the same package | made with `tools/faz_vhd.py`; the secondary SD card of the I/O board can be used instead |
+| cartridges (`.dck`) | programs on cartridge, in the DOCK | below, "Cartridges" |
+| `boot2.rom` | another TC2068 ROM, instead of the one in the core; normally not needed | below, "The 2068 ROM" |
 
-The ROM in the core is the TS2068 one as it is, unchanged. With esxDOS on, the core swaps a few bytes of the EXROM
-and of esxDOS while reading them, without touching any file (below, "esxDOS on the TC2068").
+## Using it
 
-`boot2.rom` is only for those who want another 24K ROM (HOME 16K + EXROM 8K) instead of the core's. For example the
-Portuguese TC2068 one that comes with the [Fuse](https://fuse-emulator.sourceforge.net) emulator (`roms` folder), HOME
-first, then EXROM:
+- **The machine:** the TC2068 is the default (F12 → Hardware → **Memory**, the first in the list; **Alt+F7**). The
+  others in the list are the official core's and need its ROMs (`boot.rom`): use the official core for them.
+- **Tapes:** TAP, TZX, PZX and CSW through F12 (**Load Tape**) and `LOAD ""`. They play as sound: the official core's
+  fast loading only exists for the 48K ROM.
+- **Cartridges:** F12 → **Load 2068 Cartridge** → a `.dck`; to remove it, **Reset & Detach Cartridge**.
+- **DivMMC:** F12 → **Load DivMMC** → the VHD, then **Ctrl+F11**: first the esxDOS boot, then the 2068 one. With MMC
+  Mode (F12 → Hardware) on SD Card, it is the secondary SD card. **F11** is NMI: it opens the esxDOS browser.
+- **Joysticks:** MiSTer's two joysticks are the TC2068's two (BASIC `STICK`); Kempston is there too.
+- **Sound:** the TC2068 AY, TurboSound (two AY on the 128K ports), General Sound and the beeper.
+- **Video:** the TC2068 modes (second screen, hi-colour, hi-res 512×192) and ULAplus.
 
-```
-Windows:  copy /b tc2068-0.rom + tc2068-1.rom boot2.rom
-Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
-```
+## Cartridges
 
-esxDOS on the TC2068 was only made and checked with the ROM in the core.
+The TC2068 (and the American TS2068) has a cartridge port underneath, the **DOCK**: a 64K bank, in 8 chunks of 8K,
+that port #F4 puts in place of the normal memory, chunk by chunk, with bit 7 of #FF at 0. At boot, the 2068 ROM looks
+for a cartridge and starts it:
 
-The [`releases/`](releases) folder only has the core. For F12 → Savestate Disk, the official core has a
-`savestates.sav` in its [releases folder](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
+- **LROS** (header at DOCK 0000h): it takes the whole machine, without the 2068 ROM;
+- **AROS** (header at DOCK 8000h): a machine code or BASIC program that uses the 2068 ROM. It starts by itself if the
+  cartridge asks for it; a BASIC AROS without autostart waits for a `RUN`.
 
-## Making the esxDOS VHD
+In this core, F12 → **Load 2068 Cartridge** loads a `.dck` file and resets, as when the machine is switched on with
+the cartridge in; **Reset & Detach Cartridge** removes it (the same option removes the Dandanator cartridge). Without a
+cartridge, the DOCK reads FFh.
+
+Where to find cartridges in `.dck`:
+
+- [Androids](https://timexsinclair.com/product/androids) (Timex, 1984): the game, with the download link;
+- [Spectrum Emulator](https://spectrumcomputing.co.uk/entry/4000071/Timex/Spectrum_Emulator) (TMX Portugal, 1985):
+  the Portuguese cartridge with the TC2048 ROM;
+- [Zebra OS-64](https://spectrumcomputing.co.uk/entry/4000090/Timex/Zebra_OS64), and the other Timex cartridges
+  (Flight Simulator, Pinball, Casino 1, Crazybugs…) at [timexsinclair.com](https://timexsinclair.com).
+
+The `.dck` format (from the Warajevo emulator) has, for each bank, 9 header bytes (the bank number: 0 DOCK, 254
+EXROM, 255 HOME; and one byte per 8K chunk: 0 none, 1 RAM, 2 ROM, 3 RAM with contents), followed by the images of the
+chunks that have one. The core uses the DOCK bank, the cartridge one; EXROM and HOME banks in a `.dck` are left out.
+The cartridge RAM chunks can be written; RAM chunks without contents in the file are not cleared. A `.bin` (just the
+image) does not say which chunks it goes in: use the `.dck`.
+
+## esxDOS
+
+### Making the VHD
 
 [`tools/faz_vhd.py`](tools/faz_vhd.py) makes `boot1.rom` and the VHD from the esxDOS 0.8.9 package, on Windows and
 on Linux:
@@ -56,42 +84,26 @@ on Linux:
    - **Linux:** `python3 faz_vhd.py` opens the same window (it needs tkinter: `sudo dnf install python3-tkinter` on
      Fedora, `sudo apt install python3-tk` on Debian/Ubuntu). Without a window: `python3 faz_vhd.py esxdos089.zip`
      (the name of the zip that was downloaded; `-h` shows the options).
-4. Two files come out, in a `TC2068` folder next to the zip:
+4. Two files come out, in a `TC2068` folder next to the zip; both go to `games/TC2068/` on the MiSTer SD card:
    - `boot1.rom`: the `ESXMMC.BIN` of the package, the DivMMC ROM;
    - `esxdos089.vhd`: a 128 MB card (FAT32) with the `BIN`, `SYS` and `TMP` folders of the package.
-
-   Both go to `games/TC2068/` on the MiSTer SD card.
 5. In the TC2068 core: F12 → **Load DivMMC** → `esxdos089.vhd`, then **Ctrl+F11**.
 
 In the window (or with `-e folder`) an **extra folder** can be chosen to go on the VHD too, for example games as TAP,
 to open with `.tapein` or with the esxDOS browser (F11). The VHD size goes from 64 MB to 2 GB (`-s`). The program
-warns if `ESXMMC.BIN` or `ESXDOS.SYS` are not from esxDOS 0.8.9: on the TC2068 the core only patches that version.
+warns if `ESXMMC.BIN` or `ESXDOS.SYS` are not from esxDOS 0.8.9.
 
-## Using it
+### How it works on the TC2068
 
-- **The machine:** the TC2068 is the default (F12 → Hardware → **Memory**, the first in the list; **Alt+F7**). The
-  others in the list are the official core's and need its ROMs (`boot.rom`): use the official core for them.
-- **Tapes:** TAP, TZX, PZX and CSW through F12 (Load Tape) and `LOAD ""`. They play as sound: the official core's
-  fast loading only exists for the 48K ROM.
-- **Joysticks:** MiSTer's two joysticks are the TC2068's two (BASIC `STICK`); Kempston is there too.
-- **Sound:** the TC2068 AY, TurboSound (two AY on the 128K ports), General Sound and the beeper.
-- **Video:** the TC2068 modes (second screen, hi-colour, hi-res 512×192) and ULAplus.
-- **DivMMC:** with MMC Mode (F12 → Hardware) on Auto, the default, the VHD is chosen in F12 → **Load DivMMC**;
-  with MMC Mode on SD Card, it is the secondary SD card. The DivMMC comes in at reset (**Ctrl+F11**): first the
-  esxDOS boot, then the 2068 one. The VHD (or the card) takes the `BIN`, `SYS` and `TMP` folders of the esxDOS 0.8.9
-  package, as with the official core; nothing else is needed. **F11** is NMI: it opens the esxDOS browser, as in
-  the other cores.
-
-## esxDOS on the TC2068
-
-esxDOS calls routines of the 48K ROM by address; in the 2068 ROM those routines are elsewhere, and the normal
-esxDOS hangs. In this core, on the TC2068, the core itself patches **esxDOS 0.8.9 while reading it** — `boot1.rom`
-and the card's `/SYS/ESXDOS.SYS`, without touching the files: 14 calls in the firmware and 8 in `ESXDOS.SYS` go
-to the same routines of the 2068 ROM. Each byte only changes if it still has the 0.8.9 value: the same card works
-for every machine, and the other machines see no difference at all.
+esxDOS does not come with the core: download it from [esxdos.org](https://www.esxdos.org), as for the official core.
+esxDOS calls routines of the 48K ROM by address; in the 2068 ROM those routines are elsewhere, and the normal esxDOS
+hangs. In this core, on the TC2068, the core itself patches **esxDOS 0.8.9 while reading it** — `boot1.rom` and the
+card's `/SYS/ESXDOS.SYS`, without touching the files: 14 calls in the firmware and 8 in `ESXDOS.SYS` go to the same
+routines of the 2068 ROM. For that the core only keeps a small table of the bytes to swap, not esxDOS itself. Each
+byte only changes if it still has the 0.8.9 value: the same card works for every machine.
 
 - With another esxDOS version in `boot1.rom`, the DivMMC has no esxDOS on the TC2068 (only the card ports).
-  `boot1.rom` and the card's `ESXDOS.SYS` must be the same 0.8.9 (the official core already asks for them to match).
+  `boot1.rom` and the card's `ESXDOS.SYS` must be the same 0.8.9.
 - `LOAD ""` with a TAP opened by `.tapein`: while esxDOS is on (and no tape is loaded from F12), the EXROM
   LD-BYTES enters the esxDOS tape handling (JP 0562 at 0108, and the return through 0030, which was free in the
   EXROM).
@@ -99,8 +111,8 @@ for every machine, and the other machines see no difference at all.
 ## The TC2068 in this core
 
 - 16K HOME ROM at 0000–3FFF and 8K EXROM. Port **F4** selects, for each 8K chunk, HOME (0) or EXROM/DOCK (1);
-  port **FF**, bit 7, EXROM (1) or DOCK (0). The DOCK is empty: it reads FFh and keeps no writes. FF bit 6 = 1
-  disables the interrupt. F4 and FF read back.
+  port **FF**, bit 7, EXROM (1) or DOCK (0). The DOCK is the cartridge (above); without one it reads FFh and keeps no
+  writes. FF bit 6 = 1 disables the interrupt. F4 and FF read back.
 - Port FE only answers at address FE, as on the 2068 (F4 and F6 are even too).
 - AY on **F5** (register) and **F6** (data): it is the second TurboSound chip, so FFFD/BFFD still give the two
   AY. Joysticks on register 14: A8 = joystick 1, A9 = joystick 2, active low; bit 0 up, 1 down, 2 left,
@@ -110,11 +122,12 @@ for every machine, and the other machines see no difference at all.
   0000–1FFF; 04C6 never; 0562 only right after an M1 at 0108 with the EXROM.
 - Savestates do not keep F4 or FF: they only save with F4 at 0 and come back in the normal video mode.
 
-## Why the 2068 ROM is in the core
+## The 2068 ROM
 
-So that the TC2068 boots without anyone having to go looking for a ROM. The one in `rtl/tc2068.mif` is the
-TS2068 ROM (HOME + EXROM, 24576 bytes, md5 `9194283503a105f3f3dfba13e61e993f`): the same file the
-[ZEsarUX](https://github.com/chernandezba/zesarux) emulator carries in its repository (`src/ts2068.rom`) and
+The ROM is in the core so that the TC2068 boots without anyone having to go looking for it. The one in
+`rtl/tc2068.mif` is the TS2068 ROM as it is, unchanged (HOME + EXROM, 24576 bytes, md5
+`9194283503a105f3f3dfba13e61e993f`): the same file the [ZEsarUX](https://github.com/chernandezba/zesarux) emulator
+carries in its repository (`src/ts2068.rom`) and
 [Spectrum Computing](https://spectrumcomputing.co.uk/entry/1000506/Hardware/TimexSinclair_TS2068) offers for
 download. It is the Sinclair Spectrum ROM, now Amstrad's, with Timex's changes:
 
@@ -126,26 +139,29 @@ download. It is the Sinclair Spectrum ROM, now Amstrad's, with Timex's changes:
   ([README.copyright](https://k1.spdns.de/Develop/Projects/zxsp/Media/Roms/README.copyright)); the TS2068 one has
   the same origin.
 
-The esxDOS changes were made and checked with this ROM. The `.mif` is made with
-`python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
+The `.mif` is made with `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
 
-**esxDOS does not come with the core.** Download the esxDOS 0.8.9 package from [esxdos.org](https://www.esxdos.org), as
-for the official core. The package has two parts:
+**`boot2.rom`** is only for those who want another 24K ROM (HOME 16K + EXROM 8K) instead of the core's. For example
+the Portuguese TC2068 one that comes with the [Fuse](https://fuse-emulator.sourceforge.net) emulator (`roms` folder),
+HOME first, then EXROM:
 
-- the file `ESXMMC.BIN`, the DivMMC ROM (8 KB; on a real DivMMC it is written to the EEPROM). On the MiSTer, rename it
-  to `boot1.rom` and put it in `games/TC2068/`;
-- the `BIN`, `SYS` and `TMP` folders, which go on the VHD (or the secondary SD card).
+```
+Windows:  copy /b tc2068-0.rom + tc2068-1.rom boot2.rom
+Linux:    cat tc2068-0.rom tc2068-1.rom > boot2.rom
+```
 
-To make esxDOS work with the 2068 ROM, the core swaps a few bytes while reading it. For that it only keeps a small
-table of the bytes to swap, not esxDOS itself.
+esxDOS on the TC2068 was only made and checked with the ROM in the core.
+
+The [`releases/`](releases) folder only has the core. For F12 → Savestate Disk, the official core has a
+`savestates.sav` in its [releases folder](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer/tree/master/releases).
 
 ## Building
 
 Quartus Prime Lite 17.0.2 (the MiSTer one) or Lite 25.1 (with Cyclone V support): open `TC2068.qpf` and
 Processing → Start Compilation. The result is `output_files/TC2068.rbf`. `sys/sys.qip` picks `sys/pll_q<version>.qip`
-for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`, `rtl/turbosound.sv`,
-`rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and `rtl/tc2068.mif`,
-`tools/rom2mif.py` and `tools/faz_vhd.py` are added.
+for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`,
+`rtl/turbosound.sv`, `rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and
+`rtl/tc2068.mif`, `tools/rom2mif.py` and `tools/faz_vhd.py` are added.
 
 With Quartus Lite 25.1 timing is met (November 2026: +0.5 ns setup slack on the 112 MHz clock). For that, also for
 the other machines: the copy of banks 5 and 7 for the video (the VRAM) is written a clock later, through a register;
