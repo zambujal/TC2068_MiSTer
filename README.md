@@ -176,12 +176,16 @@ Em `releases/` há duas versões do core, iguais em tudo o resto:
 - `TC2068_AAAAMMDD.rbf`: o T80 do core oficial;
 - `TC2068_T80Q_AAAAMMDD.rbf`: o T80 com o registo Q do Z80 da Zilog.
 
-Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F) dependem da instrução anterior. Num
-Z80 da Zilog, se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. O T80 do core oficial só via
-se os flags *mudavam* de valor; o da versão T80Q vê se foram *escritos*, mesmo com o mesmo valor (o POP AF, o EX AF
-e o SET/RES não contam como escrita). Por exemplo, `XOR A : CP 28h : CP 28h : SCF` dá F = 81h num Z80 e dava A9h.
-Só se nota em programas que testam o Z80, como o z80ccf do [z80test](https://github.com/raxoft/z80test) (Raxoft);
-este T80 passa o z80full e o z80ccf noutro core.
+Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F) dependem da instrução anterior
+(descoberto em 2012; as variantes estão na
+[página de David Banks](https://github.com/hoglet67/Z80Decoder/wiki/Undocumented-Flags#scfccf)). Num Z80 da Zilog,
+se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. O T80 do core oficial só via se os flags
+*mudavam* de valor; o da versão T80Q vê se foram *escritos*, mesmo com o mesmo valor (o POP AF, o EX AF e o SET/RES
+não contam como escrita). Por exemplo, `XOR A : CP 28h : CP 28h : SCF` dá F = 81h num Z80 e dava A9h.
+
+Só se nota em programas que testam o Z80. Para comparar as duas versões, o [`tools/z80test/`](tools/z80test) tem o
+z80test 1.2a de Patrik Rak (Raxoft), também numa versão que corre com a ROM do 2068 (`tools/z80test/tc2068/`): o
+z80ccf testa os flags depois de um CCF a seguir a cada instrução. Este T80 passa o z80full e o z80ccf noutro core.
 
 ## Compilar
 

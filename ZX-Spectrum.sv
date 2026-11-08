@@ -454,7 +454,9 @@ T80pa cpu
 wire [7:0] cpu_din =  
 		ss_dout_en ? ss_dout                                  :
 		~nMREQ   ? (tape_dout_en ? tape_dout : tmx_dock_rd ? 8'hFF : tmx_mem_q) :
-		~io_rd   ? port_ff                                    :
+		// INT acknowledge (M1 with IORQ): FFh with the Timex #FF, as on a real Timex (nothing drives the bus;
+		// port_ff would give the Timex register: in IM 0 the CPU runs that byte instead of RST 38h)
+		~io_rd   ? ((~nM1 & tmx_avail) ? 8'hFF : port_ff)     :
 		tmx_io   ? tmx_io_dout                                :
 		// non-Turbo base model: #1FFD reads return #FF, #7FFD is write-only
 		(scorp & (addr[14:0] == 15'h1FFD)) ? 8'hFF            :
