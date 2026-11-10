@@ -14,10 +14,9 @@ Status: testing (November 2026); tried on a MiSTer (DE10-Nano with SDRAM).
 
 The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068 needs to boot:
 
-- `TC2068_T80Q_YYYYMMDD.rbf` or `TC2068_YYYYMMDD.rbf` (the latest in [`releases/`](releases)) → folder `_Computer/`
-  on the MiSTer SD card. The date in the name is the one the menu shows. The `T80Q` one has the corrected Z80 and FFh
-  on the interrupt, as on the original Timex (below, "The Z80"); both can be there, and they use the same
-  `games/TC2068/` folder.
+- **`TC2068_T80Q_YYYYMMDD.rbf`, with the corrected Z80** (below, "The Z80"), or `TC2068_YYYYMMDD.rbf`, with the
+  official core's T80 (the latest in [`releases/`](releases)) → folder `_Computer/` on the MiSTer SD card. The date in
+  the name is the one the menu shows. Both can be there, and they use the same `games/TC2068/` folder.
 
 Everything else is optional and goes in the folder `games/TC2068/`:
 
@@ -176,9 +175,8 @@ The [`releases/`](releases) folder only has the core. For F12 → Savestate Disk
 
 There are two versions of the core in `releases/`:
 
-- `TC2068_T80Q_YYYYMMDD.rbf`: the corrected Z80 (the T80 with the Q register of the Zilog Z80) and, on interrupt
-  acknowledge, the byte FFh on the bus, as on the original Timex. This version's Z80 code is in the
-  [`t80q`](https://github.com/zambujal/TC2068_MiSTer/tree/t80q) branch.
+- **`TC2068_T80Q_YYYYMMDD.rbf`: the corrected Z80**, the T80 with the Q register of the Zilog Z80. This version's Z80
+  code is in the [`t80q`](https://github.com/zambujal/TC2068_MiSTer/tree/t80q) branch.
 - `TC2068_YYYYMMDD.rbf`: the official core's T80.
 
 After SCF or CCF, the undocumented X and Y flags (bits 5 and 3 of F) depend on the previous instruction (found in
@@ -187,10 +185,6 @@ On a Zilog Z80, if it wrote the flags, they come from A alone; if it did not, fr
 only checked whether the flags *changed*; the T80Q version checks whether they were *written*, even with the same
 value (POP AF, EX AF and SET/RES do not count as a write). For example, `XOR A : CP 28h : CP 28h : SCF` gives F = 81h
 on a Z80 and used to give A9h.
-
-In `TC2068_T80Q`, the bus reads FFh on interrupt acknowledge, as on the original Timex. Before, the core put the value
-of the Timex port #FF register there (screen mode, DOCK/EXROM): in IM 0 the Z80 executed that byte instead of RST 38h,
-and in IM 2 it read the vector at xx00 instead of xxFF.
 
 It only shows in programs that test the Z80. To compare the two versions, [`tools/z80test/`](tools/z80test) has
 Patrik Rak's (Raxoft) z80test 1.2a, also in a version that runs with the 2068 ROM (`tools/z80test/tc2068/`): z80ccf
