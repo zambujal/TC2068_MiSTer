@@ -14,9 +14,9 @@ Estado: em teste (Novembro de 2026); experimentado num MiSTer (DE10-Nano com SDR
 
 A **ROM do TC2068 vem dentro do core** (porquê, em baixo). Para o TC2068 arrancar basta o `.rbf`:
 
-- `TC2068_AAAAMMDD.rbf` (o mais recente de [`releases/`](releases)) → pasta `_Computer/` do cartão do MiSTer. A data
-  no nome é a que o menu mostra. Ou o `TC2068_T80Q_AAAAMMDD.rbf`, o mesmo com o Z80 corrigido (em baixo, "O Z80");
-  podem estar os dois, e usam a mesma pasta `games/TC2068/`.
+- `TC2068_T80Q_AAAAMMDD.rbf` ou `TC2068_AAAAMMDD.rbf` (o mais recente de [`releases/`](releases)) → pasta
+  `_Computer/` do cartão do MiSTer. A data no nome é a que o menu mostra. O `T80Q` tem o Z80 corrigido e o FFh na
+  interrupção, como no Timex original (em baixo, "O Z80"); podem estar os dois, e usam a mesma pasta `games/TC2068/`.
 
 O resto é opcional e vai na pasta `games/TC2068/`:
 
@@ -171,10 +171,12 @@ A pasta [`releases/`](releases) só tem o core. Para o F12 → Savestate Disk, o
 
 ## O Z80 (T80)
 
-Em `releases/` há duas versões do core, iguais em tudo o resto:
+Em `releases/` há duas versões do core:
 
-- `TC2068_AAAAMMDD.rbf`: o T80 do core oficial;
-- `TC2068_T80Q_AAAAMMDD.rbf`: o T80 com o registo Q do Z80 da Zilog.
+- `TC2068_T80Q_AAAAMMDD.rbf`: o Z80 corrigido (o T80 com o registo Q do Z80 da Zilog) e, na aceitação da
+  interrupção, o byte FFh no bus, como no Timex original. O código do Z80 desta versão está no ramo
+  [`t80q`](https://github.com/zambujal/TC2068_MiSTer/tree/t80q).
+- `TC2068_AAAAMMDD.rbf`: o T80 do core oficial.
 
 Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F) dependem da instrução anterior
 (descoberto em 2012; as variantes estão na
@@ -182,6 +184,10 @@ Depois de um SCF ou de um CCF, os flags não documentados X e Y (bits 5 e 3 do F
 se ela escreveu os flags, vêm só do A; se não os escreveu, vêm do A e do F. O T80 do core oficial só via se os flags
 *mudavam* de valor; o da versão T80Q vê se foram *escritos*, mesmo com o mesmo valor (o POP AF, o EX AF e o SET/RES
 não contam como escrita). Por exemplo, `XOR A : CP 28h : CP 28h : SCF` dá F = 81h num Z80 e dava A9h.
+
+No `TC2068_T80Q`, na aceitação da interrupção o bus lê FFh, como no Timex original. Antes o core punha lá o valor do
+registo da porta #FF do Timex (modo de ecrã, DOCK/EXROM): em IM 0 o Z80 executava esse byte em vez do RST 38h, e em
+IM 2 lia o vector em xx00 em vez de xxFF.
 
 Só se nota em programas que testam o Z80. Para comparar as duas versões, o [`tools/z80test/`](tools/z80test) tem o
 z80test 1.2a de Patrik Rak (Raxoft), também numa versão que corre com a ROM do 2068 (`tools/z80test/tc2068/`): o
@@ -193,9 +199,11 @@ Quartus Prime Lite 17.0.2 (o do MiSTer) ou o Lite 25.1 (com o suporte do Cyclone
 Processing → Start Compilation. Sai `output_files/TC2068.rbf`. O `sys/sys.qip` vai buscar o `sys/pll_q<versão>.qip`
 da versão do Quartus: há o 17 e o 25 (igual ao 17). Em relação ao core oficial mudam `ZX-Spectrum.sv`,
 `rtl/turbosound.sv`, `rtl/divmmc.v`, `ZX-Spectrum.sdc`, o projecto (`TC2068.qpf`, `.qsf`, `.srf`) e juntam-se
-`rtl/tc2068.mif`, `tools/rom2mif.py` e `tools/faz_vhd.py`.
+`rtl/tc2068.mif`, `tools/rom2mif.py` e `tools/faz_vhd.py`. O `TC2068_T80Q` compila-se do ramo `t80q` (muda só o
+`rtl/T80/T80.vhd`).
 
-No Quartus Lite 25.1 os tempos cumprem-se (Novembro de 2026: no relógio de 112 MHz, slack de setup de +0,7 ns). Para
+No Quartus Lite 25.1 os tempos cumprem-se (Novembro de 2026: no relógio de 112 MHz, slack de setup de +0,7 ns; na
+versão T80Q, +0,48 ns). Para
 isso, também para as outras máquinas: a cópia dos bancos 5 e 7 para o vídeo (a VRAM) é escrita um ciclo depois, por
 um registo; e o `ZX-Spectrum.sdc` dá dois ciclos aos caminhos que partem do que só muda com um OUT (as portas #F4 e
 #FF do TC2068, a #E3 da DivMMC) e do sinal de refresh do Z80 até à SDRAM.
