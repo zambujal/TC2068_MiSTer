@@ -20,8 +20,7 @@ The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068
   the name is the one the menu shows. Both can be there, and they use the same `games/TC2068/` folder.
 
 `TC2068_T80Q_20261111.rbf` already has BRIGHT black as grey (11 November 2026); `TC2068_20261110.rbf`, with the
-official T80, does not yet. The TC2048 core has no `.rbf` in `releases/` yet: it is being tested and, for now, it is
-built from the code (below, "Building").
+official T80, does not yet. The TC2048 core is `TC2048_YYYYMMDD.rbf` (below, "The TC2048 core").
 
 Everything else is optional and goes in the folder `games/TC2068/`:
 
@@ -158,7 +157,8 @@ the [Fuse](https://fuse-emulator.sourceforge.net) emulator:
   stays (the TC2048 has no AY, but it does no harm);
 - the DivMMC and esxDOS as on the 48K (esxDOS unchanged);
 - BRIGHT black is black;
-- 48K snapshots stay on the TC2048.
+- 48K snapshots stay on the TC2048;
+- the corrected Z80 (T80Q; below, "The Z80").
 
 Status: to be tested on a MiSTer (November 2026).
 
