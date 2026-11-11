@@ -19,8 +19,9 @@ The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068
   official core's T80 (the latest in [`releases/`](releases)) → folder `_Computer/` on the MiSTer SD card. The date in
   the name is the one the menu shows. Both can be there, and they use the same `games/TC2068/` folder.
 
-What came in on 11 November 2026 (BRIGHT black as grey on the TC2068, the TC2048 core and the tests) is not yet in the
-`.rbf` files in `releases/`: it is being tested and, for now, it is built from the code (below, "Building").
+`TC2068_T80Q_20261111.rbf` already has BRIGHT black as grey (11 November 2026); `TC2068_20261110.rbf`, with the
+official T80, does not yet. The TC2048 core has no `.rbf` in `releases/` yet: it is being tested and, for now, it is
+built from the code (below, "Building").
 
 Everything else is optional and goes in the folder `games/TC2068/`:
 
