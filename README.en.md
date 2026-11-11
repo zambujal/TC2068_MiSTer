@@ -4,7 +4,8 @@
 
 The official MiSTer **ZX-Spectrum** core ([MiSTer-devel](https://github.com/MiSTer-devel/ZX-Spectrum_MISTer), by
 Sorgelig and others) with the **Timex Computer TC2068** as its main machine: HOME ROM and EXROM, DOCK cartridges, AY,
-joysticks, Timex video modes and DivMMC with esxDOS. It is only for the TC2068: for the other machines (Spectrum 48K,
+joysticks, Timex video modes and DivMMC with esxDOS. A second core comes from the same code, the **Timex Computer
+TC2048** (below, "The TC2048 core"). It is only for the TC2068 and the TC2048: for the other machines (Spectrum 48K,
 128K, +2A/+3, Pentagon…) use the official core. What the official core does is in
 [README_ZX-Spectrum.md](README_ZX-Spectrum.md).
 
@@ -38,7 +39,8 @@ Everything else is optional and goes in the folder `games/TC2068/`:
   Mode (F12 → Hardware) on SD Card, it is the secondary SD card. **F11** is NMI: it opens the esxDOS browser.
 - **Joysticks:** MiSTer's two joysticks are the TC2068's two (BASIC `STICK`); Kempston is there too.
 - **Sound:** the TC2068 AY, TurboSound (two AY on the 128K ports), General Sound and the beeper.
-- **Video:** the TC2068 modes (second screen, hi-colour, hi-res 512×192) and ULAplus.
+- **Video:** the TC2068 modes (second screen, hi-colour, hi-res 512×192) and ULAplus. BRIGHT black shows as dark
+  grey, as on a real TC2068 (on the TC2048 and the Spectrum it is black).
 
 ## Cartridges
 
@@ -138,6 +140,24 @@ byte only changes if it still has the 0.8.9 value: the same card works for every
   0000–1FFF; 04C6 never; 0562 only right after an M1 at 0108 with the EXROM.
 - Savestates do not keep F4 or FF: they only save with F4 at 0 and come back in the normal video mode.
 
+## The TC2048 core
+
+A second core comes from the same code, the **Timex Computer TC2048**: `TC2048_YYYYMMDD.rbf` goes in the `_Computer/`
+folder and uses the `games/TC2048/` folder (`boot1.rom` and the esxDOS VHD, as for the TC2068). It is the TC2048 as in
+the [Fuse](https://fuse-emulator.sourceforge.net) emulator:
+
+- the TC2048 ROM is inside the core (`rtl/tc2048.mif`; below, "The 2068 ROM"). It is the 48K one with 7 bytes changed:
+  an OUT (#FF),A with A = 0 before the © message;
+- the Timex video modes on port FF (second screen, hi-colour, hi-res 512×192). FF bit 6 = 1 stops the interrupt and
+  FF reads back. Port FE only answers at address FE;
+- the Kempston joystick, the TC2048's only port. There is no F4, DOCK, EXROM nor AY at F5/F6; the core's TurboSound
+  stays (the TC2048 has no AY, but it does no harm);
+- the DivMMC and esxDOS as on the 48K (esxDOS unchanged);
+- BRIGHT black is black;
+- 48K snapshots stay on the TC2048.
+
+Status: to be tested on a MiSTer (November 2026).
+
 ## The 2068 ROM
 
 The ROM is in the core so that the TC2068 boots without anyone having to go looking for it. The one in
@@ -156,6 +176,11 @@ download. It is the Sinclair Spectrum ROM, now Amstrad's, with Timex's changes:
   the same origin.
 
 The `.mif` is made with `python3 tools/rom2mif.py 32768 rtl/tc2068.mif ts2068.rom`.
+
+The TC2048 core's one, in `rtl/tc2048.mif`, is the TC2048 ROM as it is (16384 bytes, md5
+`9dd7ecf784a6c04265c073c236f5fadb`): the same as ZEsarUX's (`src/tc2048.rom`) and Debian's spectrum-roms package. The
+zxsp note says it is Amstrad's and that Amstrad allows it to be distributed. It is made with
+`python3 tools/rom2mif.py 32768 rtl/tc2048.mif tc2048.rom`.
 
 **`boot2.rom`** is only for those who want another 24K ROM (HOME 16K + EXROM 8K) instead of the core's. For example
 the Portuguese TC2068 one that comes with the [Fuse](https://fuse-emulator.sourceforge.net) emulator (`roms` folder),
@@ -196,8 +221,9 @@ Quartus Prime Lite 17.0.2 (the MiSTer one) or Lite 25.1 (with Cyclone V support)
 Processing → Start Compilation. The result is `output_files/TC2068.rbf`. `sys/sys.qip` picks `sys/pll_q<version>.qip`
 for the Quartus version: there are 17 and 25 (the same as 17). Compared with the official core, `ZX-Spectrum.sv`,
 `rtl/turbosound.sv`, `rtl/divmmc.v`, `ZX-Spectrum.sdc` and the project (`TC2068.qpf`, `.qsf`, `.srf`) change, and
-`rtl/tc2068.mif`, `tools/rom2mif.py` and `tools/faz_vhd.py` are added. `TC2068_T80Q` is built from the `t80q` branch
-(only `rtl/T80/T80.vhd` changes).
+`rtl/tc2068.mif`, `rtl/tc2048.mif`, `tools/rom2mif.py` and `tools/faz_vhd.py` are added. `TC2068_T80Q` is built from
+the `t80q` branch (only `rtl/T80/T80.vhd` changes). The TC2048 core comes from `TC2048.qpf`: the same files, with
+`TC2048` defined in the `.qsf`; it gives `output_files/TC2048.rbf`.
 
 With Quartus Lite 25.1 timing is met (November 2026: +0.7 ns setup slack on the 112 MHz clock; +0.48 ns in the T80Q
 version). For that, also for
