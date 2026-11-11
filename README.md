@@ -19,8 +19,9 @@ A **ROM do TC2068 vem dentro do core** (porquê, em baixo). Para o TC2068 arranc
   core oficial (o mais recente de [`releases/`](releases)) → pasta `_Computer/` do cartão do MiSTer. A data no nome é
   a que o menu mostra. Podem estar os dois, e usam a mesma pasta `games/TC2068/`.
 
-O que entrou a 11 de Novembro de 2026 (o preto com BRIGHT cinzento no TC2068, o core TC2048 e os testes) ainda não
-está nos `.rbf` de `releases/`: está a ser testado e, por agora, compila-se (em baixo, "Compilar").
+O `TC2068_T80Q_20261111.rbf` já tem o preto com BRIGHT cinzento (11 de Novembro de 2026); o `TC2068_20261110.rbf`,
+com o T80 oficial, ainda não. O core TC2048 ainda não tem `.rbf` em `releases/`: está a ser testado e, por agora,
+compila-se (em baixo, "Compilar").
 
 O resto é opcional e vai na pasta `games/TC2068/`:
 
