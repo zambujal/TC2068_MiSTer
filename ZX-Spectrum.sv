@@ -366,7 +366,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.status_set(speed_set|arch_set|snap_hwset|opt_dan),
 	.status_in({status[63], status[62] | opt_dan, status[61:25],
 	             speed_set ? speed_req : (arch_set | snap_hwset) ? 3'b000 : status[24:22], status[21:13],
-	             arch_set ? arch_status(arch) : snap_hwset ? arch_status(snap_hw_t) : status[12:8], status[7:0]}),
+	             arch_set ? arch_status(arch) : snap_hwset ? arch_status(snap_hw) : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_blk_cnt(sd_blk_cnt),
@@ -1875,7 +1875,7 @@ wire         snap_wr;
 wire         snap_reset;
 wire         snap_hwset;
 wire   [4:0] snap_hw;
-wire   [4:0] snap_hw_t = (t48_sel && (snap_hw == ARCH_ZX48)) ? ARCH_TC2068 : snap_hw; // TC2048: 48K snapshots stay on it
+wire   [4:0] snap_ack  = {t48_sel ? 3'd3 : mem_mode, status[9:8]}; // TC2048: the loader sees a ZX 48, so 48K snapshots load on it
 wire  [31:0] snap_status;
 wire   [2:0] snap_border;
 wire   [7:0] snap_1ffd;
@@ -1904,7 +1904,7 @@ snap_loader #(ARCH_ZX48, ARCH_ZX128, ARCH_ZX3, ARCH_P128, ARCH_SCORP) snap_loade
    .reset(snap_reset),
    .hwset(snap_hwset),
    .hw(snap_hw),
-   .hw_ack({mem_mode, status[9:8]}),
+   .hw_ack(snap_ack),
 
    .border(snap_border),
    .reg_1ffd(snap_1ffd),
