@@ -68,6 +68,14 @@ localparam ARCH_TC2068= 5'b110_00; // Timex TC2068
 //   ROM, and its tape trap returns through EXROM 0030 (RRA / JP 010B), with JP 0562 at EXROM
 //   0108 while esxDOS is on and no tape is loaded from the OSD. Each byte is only changed when
 //   it still has the 0.8.9 value. Another esxDOS version: the DivMMC has no esxDOS in this mode.
+//   BRIGHT black is dark grey, as on a real TC2068 (black on the Spectrum and the TC2048).
+//
+// Timex TC2048 (the TC2048 core: TC2048.qpf, `define TC2048; there memory code 6 and the first entry of the Memory menu
+// are the TC2048, and the TC2068 is not in it). As Fuse's TC2048: the 48K machine with the TC2048 ROM inside the core
+// (rtl/tc2048.mif, BRAM; it is the 48K ROM with an OUT (#FF),A with A = 0 before the copyright message), the SCLD
+// #FF (screen modes; bit 6 = 1 stops the frame interrupt; it reads back), #FE only at #FE, the Kempston joystick.
+// No #F4, DOCK, EXROM nor AY at #F5/#F6 (the Turbosound of the core stays, like the other extras). The DivMMC,
+// TR-DOS, +D, Multiface and the tape ROM traps work as on the 48K. BRIGHT black is black. 48K snapshots stay on it.
 
 localparam CONF_BDI   = "(BDI)";
 localparam CONF_PLUSD = "(+D) ";
@@ -82,11 +90,17 @@ localparam CONF_PLUS3 = "(+3) ";
 
 `include "build_id.v"
 localparam CONF_STR = {
+`ifdef TC2048
+	"TC2048;;",
+`else
 	"TC2068;;",
+`endif
 	"S0,TRDIMGDSKMGT,Load Disk;",
 	"F2,TAPCSWTZXPZX,Load Tape;",
 	"F4,Z80SNA,Load Snapshot;",
+`ifndef TC2048
 	"H6F3,DCK,Load 2068 Cartridge;",
+`endif
 	"S1,VHD,Load DivMMC;",
 	"F6,ROMMLD,Load Dandanator;",
 	"SC2,SAV,Savestate Disk;",
@@ -129,7 +143,11 @@ localparam CONF_STR = {
 	"D3P2OP,Snow Bug,Disabled,Enabled;",
 	"P2-;",
 	"P2O[9:8],Video Timings,ULA-48,ULA-128,Pentagon,Scorpion;",
+`ifdef TC2048
+	"P2O[12:10],Memory,Timex TC2048,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3,Scorpion ZS-256;",
+`else
 	"P2O[12:10],Memory,Timex TC2068,Spectrum 128K/+2,Pentagon 1024K,Profi 1024K,Spectrum 48K,Spectrum +2A/+3,Scorpion ZS-256;",
+`endif
 	"P2-;",
 	"P2O[33:32],MMC Mode,Auto(VHD),SD Card 14MHz,SD Card 28MHz;",
 	"P2O[31:30],MMC Version,DivMMC+ESXDOS,DivMMC,ZXMMC;",
@@ -348,7 +366,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 	.status_set(speed_set|arch_set|snap_hwset|opt_dan),
 	.status_in({status[63], status[62] | opt_dan, status[61:25],
 	             speed_set ? speed_req : (arch_set | snap_hwset) ? 3'b000 : status[24:22], status[21:13],
-	             arch_set ? arch_status(arch) : snap_hwset ? arch_status(snap_hw) : status[12:8], status[7:0]}),
+	             arch_set ? arch_status(arch) : snap_hwset ? arch_status(snap_hw_t) : status[12:8], status[7:0]}),
 
 	.sd_lba(sd_lba),
 	.sd_blk_cnt(sd_blk_cnt),
@@ -378,6 +396,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3)) hps_io
 
 // Memory menu: entry 0 = Timex TC2068, then the original list. mem_mode is the internal
 // code: the original values 0-5 and 6 = TC2068 (also in arch, snap_hw and the savestates).
+// In the TC2048 core, entry 0 and code 6 are the Timex TC2048.
 wire [2:0] mem_mode = (status[12:10] == 3'd0) ? 3'd6 : (status[12:10] - 3'd1);
 
 function [4:0] arch_status;   // internal {mem_mode, timings} -> status[12:8]
@@ -418,7 +437,7 @@ wire        io_rd = ~nIORQ & ~nRD & nM1;
 wire        m1    = ~nM1 & ~nMREQ;
 
 // TC2068: #FF bit 6 = 1 stops the frame interrupt (not while the savestate code runs)
-wire        nINT_cpu = nINT | (tmx_mode & tmx_dec[6] & ~ss_active);
+wire        nINT_cpu = nINT | ((tmx_mode | t48_mode) & tmx_dec[6] & ~ss_active);
 
 wire[211:0]	cpu_reg;  // IFF2, IFF1, IM, IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
 wire        nHALT;
@@ -796,12 +815,14 @@ always @(posedge clk_sys) begin
 			pf1024 <= 0;
 			zx48   <= ~plus3;
 			tmx_mode <= 0;
+			t48_mode <= 0;
 		end else begin
 			p1024 <= (mem_mode == 1);
 			pf1024<= (mem_mode == 2);
-			zx48  <= (mem_mode == 3) | (mem_mode == 6); // TC2068: 48K RAM, no 7FFD (without its ROM: a 48K)
+			zx48  <= (mem_mode == 3) | (mem_mode == 6); // TC2068/TC2048: 48K RAM, no 7FFD (without its ROM: a 48K)
 			plus3 <= (mem_mode == 4);
 			tmx_mode <= tmx_sel;
+			t48_mode <= t48_sel;
 		end
 	end else begin
 		if(snap_REGSet) begin
@@ -844,7 +865,14 @@ end
 
 ////////////////////  TC2068  ////////////////////
 // (see the notes at ARCH_TC2068)
+`ifdef TC2048
+wire       tmx_sel = 1'b0;                          // the TC2068 is not in this core
+wire       t48_sel = (mem_mode == 6);               // TC2048 chosen (its ROM is inside)
+`else
 wire       tmx_sel = (mem_mode == 6);               // TC2068 chosen (its ROM is inside; boot2.rom replaces it)
+wire       t48_sel = 1'b0;                          // the TC2048 is the other core
+`endif
+reg        t48_mode = 0;                            // set at reset, like tmx_mode
 reg        tmx_mode = 0;                            // set at reset, like zx48
 reg  [7:0] tmx_hsr;                                 // #F4: chunks in EXROM/DOCK
 reg  [7:0] tmx_dec;                                 // #FF: the ULA keeps bits 5-0 for the video
@@ -866,13 +894,17 @@ wire [13:0] a14         = { addr[13] & ~tmx_exr, addr[12:0] };
 wire [24:0] tmx_exrom   = tmx_dec[7] ? { 3'b101, 4'd1, a14 } : { 9'h01C, addr[15:0] };
 wire        tmx_dock_lo = tmx_exr & ~tmx_dec[7] & ~mmc_rom_en;           // the DOCK at 0000-3FFF (the DivMMC ROM comes first)
 
+// BRIGHT black: dark grey on a real TC2068; black on the Spectrum and the TC2048
+reg         tmx_grey = 0;
+always @(posedge clk_sys) tmx_grey <= tmx_mode;
+
 always @(posedge clk_sys) begin
 	reg old_wr;
 	old_wr <= io_wr;
 
 	if(reset) {tmx_hsr, tmx_dec} <= 0;
-	else if(io_wr & ~old_wr & tmx_mode & ~ss_active) begin
-		if(addr[7:0] == 8'hF4) tmx_hsr <= cpu_dout;
+	else if(io_wr & ~old_wr & (tmx_mode | t48_mode) & ~ss_active) begin
+		if((addr[7:0] == 8'hF4) & tmx_mode) tmx_hsr <= cpu_dout;   // the TC2048 has no DOCK nor EXROM
 		if(addr[7:0] == 8'hFF) tmx_dec <= cpu_dout;
 	end
 end
@@ -896,18 +928,28 @@ wire [7:0] tmx_stick1 = {joy0[4], 3'b000, joy0[0], joy0[1], joy0[2], joy0[3]}; /
 wire [7:0] tmx_stick2 = {joy1[4], 3'b000, joy1[0], joy1[1], joy1[2], joy1[3]};
 wire [7:0] tmx_stick  = ~(({8{addr[8]}} & tmx_stick1) | ({8{addr[9]}} & tmx_stick2));
 
-// port reads: #F4, #FF, #F6
-wire       tmx_io      = tmx_mode & ~ss_active & ((addr[7:0] == 8'hF4) | (addr[7:0] == 8'hFF) | (addr[7:0] == 8'hF6));
+// port reads: #F4, #FF, #F6 (the TC2048: #FF)
+wire       tmx_io      = ~ss_active & ((tmx_mode & ((addr[7:0] == 8'hF4) | (addr[7:0] == 8'hFF) | (addr[7:0] == 8'hF6))) |
+                                       (t48_mode & (addr[7:0] == 8'hFF)));
 wire [7:0] tmx_io_dout = (addr[7:0] == 8'hF4) ? tmx_hsr :
                          (addr[7:0] == 8'hFF) ? tmx_dec :
                          (tmx_ay_reg == 8'd14) ? tmx_stick : tmx_psg_dout;
 
 
+`ifdef TC2048
+// The TC2048 ROM inside the core, at 0000-3FFF. What pages its own ROM in there comes first, as on the 48K: the
+// DivMMC, the shadow ROM, TR-DOS, +D, the Multiface and the Dandanator.
+wire        tmx_brom_rd = t48_mode & ~addr[15] & ~addr[14] & ~mmc_rom_en & ~mmc_ram_en & ~shadow_rom & ~trdos_en &
+                          ~plusd_mem & ~mf128_mem & ~dan_rom & ~ss_active;
+localparam  TMX_ROM_MIF = "rtl/tc2048.mif";
+`else
 // The 2068 ROM inside the core: HOME at 0000-3FFF, EXROM at 4000-5FFF (boot2.rom replaces it)
 wire        tmx_brom_rd = tmx_mode & ~tmx_rom_ok & ~mmc_rom_en & ~mmc_ram_en & ~ss_active &
                           ((~addr[15] & ~addr[14] & ~tmx_ext) | (tmx_ext & tmx_dec[7]));
+localparam  TMX_ROM_MIF = "rtl/tc2068.mif";
+`endif
 wire  [7:0] tmx_brom_q;
-dpram #(.DATAWIDTH(8), .ADDRWIDTH(15), .MEM_INIT_FILE("rtl/tc2068.mif")) tmx_rom
+dpram #(.DATAWIDTH(8), .ADDRWIDTH(15), .MEM_INIT_FILE(TMX_ROM_MIF)) tmx_rom
 (
 	.clock(clk_sys),
 	.address_a(tmx_ext ? {2'b10, addr[12:0]} : {1'b0, addr[13:0]}),
@@ -997,7 +1039,7 @@ wire  [7:0] tmx_mem_q  = (tmx_pt[16] && (tmx_mq == tmx_pt[15:8])) ? tmx_pt[7:0] 
 
 ////////////////////  ULA PORT  ///////////////////
 // the TC2068 decodes #FE with the whole low byte (#F4 and #F6 are even too: no border or beeper there)
-wire      ula_port = ~addr[0] & (~tmx_mode | (addr[7:0] == 8'hFE));
+wire      ula_port = ~addr[0] & (~(tmx_mode | t48_mode) | (addr[7:0] == 8'hFE));
 
 reg [2:0] border_color = 3'b000;   // Scorpion reads this before write
 reg       ear_out;
@@ -1294,7 +1336,7 @@ wire [1:0] scale = status[16:15];
 wire       HSync, VSync, HBlank, VBlank;
 wire       ulap_ena, ulap_mono, mode512;
 wire       ulap_avail = ~status[14] & ~trdos_en;
-wire       tmx_avail = (~status[13] | tmx_mode) & ~trdos_en; // the TC2068 always has its #FF
+wire       tmx_avail = (~status[13] | tmx_mode | t48_mode) & ~trdos_en; // the TC2068 and the TC2048 always have their #FF
 wire       snow_ena = status[25] & &turbo & ~plus3;
 wire       I,R,G,B;
 wire [7:0] ulap_color;
@@ -1329,7 +1371,8 @@ always @(posedge CLK_VIDEO) if (ce_pix) begin
 	vbl <= VBlank;
 
 	casex({ulap_ena & ~ss_active, ulap_mono})
-		'b0X: {Gx,Rx,Bx} <= {G, G, {6{I & G}}, R, R, {6{I & R}}, B, B, {6{I & B}}};
+		'b0X: {Gx,Rx,Bx} <= (tmx_grey & I & ~G & ~R & ~B) ? {3{8'h3C}} :            // TC2068: BRIGHT black is dark grey
+		                    {G, G, {6{I & G}}, R, R, {6{I & R}}, B, B, {6{I & B}}};
 		'b10: {Gx,Rx,Bx} <= {{2{ulap_color[7:5]}}, ulap_color[7:6], {2{ulap_color[4:2]}}, ulap_color[4:3], {4{ulap_color[1:0]}}};
 		'b11: {Gx,Rx,Bx} <= {3{ulap_color}};
 	endcase
@@ -1808,7 +1851,7 @@ always @(posedge clk_sys) begin
 		if(~old_Fn[4] & Fn[4]) {setwait,arch_set,arch} <= {2'b11,ARCH_P48  }; // Alt+F4 - Pentagon 48
 		if(~old_Fn[5] & Fn[5]) {setwait,arch_set,arch} <= {2'b11,ARCH_P128 }; // Alt+F5 - Pentagon 128
 		if(~old_Fn[6] & Fn[6]) {setwait,arch_set,arch} <= {2'b11,ARCH_P1024}; // Alt+F6 - Pentagon 1024
-		if(~old_Fn[7] & Fn[7]) {setwait,arch_set,arch} <= {2'b11,ARCH_TC2068}; // Alt+F7 - Timex TC2068
+		if(~old_Fn[7] & Fn[7]) {setwait,arch_set,arch} <= {2'b11,ARCH_TC2068}; // Alt+F7 - Timex TC2068 (the TC2048 in the TC2048 core)
 	end
 
 	if(timeout) timeout <= timeout - 1'd1;
@@ -1832,6 +1875,7 @@ wire         snap_wr;
 wire         snap_reset;
 wire         snap_hwset;
 wire   [4:0] snap_hw;
+wire   [4:0] snap_hw_t = (t48_sel && (snap_hw == ARCH_ZX48)) ? ARCH_TC2068 : snap_hw; // TC2048: 48K snapshots stay on it
 wire  [31:0] snap_status;
 wire   [2:0] snap_border;
 wire   [7:0] snap_1ffd;
