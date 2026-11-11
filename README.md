@@ -19,6 +19,9 @@ A **ROM do TC2068 vem dentro do core** (porquê, em baixo). Para o TC2068 arranc
   core oficial (o mais recente de [`releases/`](releases)) → pasta `_Computer/` do cartão do MiSTer. A data no nome é
   a que o menu mostra. Podem estar os dois, e usam a mesma pasta `games/TC2068/`.
 
+O que entrou a 11 de Novembro de 2026 (o preto com BRIGHT cinzento no TC2068, o core TC2048 e os testes) ainda não
+está nos `.rbf` de `releases/`: está a ser testado e, por agora, compila-se (em baixo, "Compilar").
+
 O resto é opcional e vai na pasta `games/TC2068/`:
 
 | Ficheiro | Para quê | Onde se vai buscar |
@@ -156,6 +159,15 @@ emulador [Fuse](https://fuse-emulator.sourceforge.net):
 - os snapshots de 48K ficam no TC2048.
 
 Estado: por testar no MiSTer (Novembro de 2026).
+
+## Testes
+
+A pasta [`testes/`](testes) tem um programa que testa o TC2048 e o TC2068, nos dois cores ou nas máquinas
+verdadeiras. Vê a máquina pela ROM; testa o Z80, a INT, as portas (FF, F4, FE, 7FFD), a EXROM, o AY, o Kempston e o
+preto com BRIGHT; mostra os joysticks em directo e os modos de vídeo da porta FF. Os resultados saem a cores: verde =
+como o original, amarelo = a mais, vermelho = falta ou está errado. `teste_timex.tap` serve para os dois,
+`teste_timex.dck` (cartucho) para o TC2068 e `teste_timex.sna` para o TC2048. Mais em
+[testes/README.md](testes/README.md).
 
 ## A ROM do 2068
 

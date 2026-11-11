@@ -19,6 +19,9 @@ The **TC2068 ROM is inside the core** (why, below). The `.rbf` is all the TC2068
   official core's T80 (the latest in [`releases/`](releases)) → folder `_Computer/` on the MiSTer SD card. The date in
   the name is the one the menu shows. Both can be there, and they use the same `games/TC2068/` folder.
 
+What came in on 11 November 2026 (BRIGHT black as grey on the TC2068, the TC2048 core and the tests) is not yet in the
+`.rbf` files in `releases/`: it is being tested and, for now, it is built from the code (below, "Building").
+
 Everything else is optional and goes in the folder `games/TC2068/`:
 
 | File | What for | Where to get it |
@@ -157,6 +160,15 @@ the [Fuse](https://fuse-emulator.sourceforge.net) emulator:
 - 48K snapshots stay on the TC2048.
 
 Status: to be tested on a MiSTer (November 2026).
+
+## Tests
+
+The [`testes/`](testes) folder has a program that tests the TC2048 and the TC2068, on both cores or on the real
+machines. It tells the machine from its ROM; tests the Z80, the interrupt, the ports (FF, F4, FE, 7FFD), the EXROM,
+the AY, the Kempston and BRIGHT black; shows the joysticks live and the port FF video modes. The results come in
+colours: green = as on the original, yellow = extra, red = missing or wrong. `teste_timex.tap` is for both,
+`teste_timex.dck` (cartridge) for the TC2068 and `teste_timex.sna` for the TC2048. More in
+[testes/README.en.md](testes/README.en.md).
 
 ## The 2068 ROM
 
